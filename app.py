@@ -2607,29 +2607,25 @@ def institutional_view():
     '''
     return html
 
-# ================== 加密貨幣數據（使用 ccxt） ==================
-def get_crypto_price_ccxt(symbol, exchange_id='binance'):
-    """透過 ccxt 從幣安獲取指定加密貨幣交易對的最新價格"""
+# ================== 加密貨幣即時報價（ccxt） ==================
+import ccxt
+
+def get_crypto_price_ccxt(symbol, exchange='binance'):
     try:
-        # 動態載入幣安交易所
-        exchange_class = getattr(ccxt, exchange_id)
-        exchange = exchange_class()
-        # 抓取即時 ticker
-        ticker = exchange.fetch_ticker(symbol)
-        price = ticker.get('last')
-        if price is None:
-            price = ticker.get('ask')
+        exchange_class = getattr(ccxt, exchange)
+        ex = exchange_class()
+        ticker = ex.fetch_ticker(symbol)
+        price = ticker.get('last') or ticker.get('ask')
         return price
     except Exception as e:
-        print(f"ccxt 錯誤: {e}")
+        print(f"ccxt error: {e}")
         return None
 
 @app.route('/crypto_price/<symbol>')
 def crypto_price(symbol):
-    """API 端點：回傳指定加密貨幣的最新價格"""
-    price = get_crypto_price_ccxt(symbol)
-    if price is not None:
-        return jsonify({'symbol': symbol, 'price': price})
+    price = get_crypto_price_ccxt(symbol.upper())
+    if price:
+        return jsonify({'symbol': symbol.upper(), 'price': price})
     else:
         return jsonify({'error': f'無法獲取 {symbol} 價格'}), 500
 # ================== 主程式 ==================
