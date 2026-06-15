@@ -2684,7 +2684,7 @@ if __name__ == "__main__":
     print("手動更新完成")
     # ========== 手動測試結束 ==========
         # 啟動 Shioaji WebSocket 即時訂閱
-    init_shioaji_websocket()
+    # init_shioaji_websocket()   # 暂时禁用，避免启动错误
     
 
     scheduler.start()
