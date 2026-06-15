@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>三大法人買賣超一覽</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+        th { background-color: #f2f2f2; }
+        .buy { color: red; font-weight: bold; }
+        .sell { color: green; }
+    </style>
+</head>
+<body>
+    <h1>三大法人買賣超 - 最新資料</h1>
+    <a href="/">返回首頁</a>
+    <table>
+        <thead>
+            <tr>
+                <th>股票代號</th>
+                <th>日期</th>
+                <th>外資買賣超</th>
+                <th>投信買賣超</th>
+                <th>自營商買賣超</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in data %}
+            <tr>
+                <td>{{ row['stock_id'] }}</td>
+                <td>{{ row['date'] }}</td>
+                <td class="{{ 'buy' if row['foreign_investors'] > 0 else 'sell' }}">{{ row['foreign_investors'] | format_number }}</td>
+                <td class="{{ 'buy' if row['investment_trust'] > 0 else 'sell' }}">{{ row['investment_trust'] | format_number }}</td>
+                <td class="{{ 'buy' if row['dealers'] > 0 else 'sell' }}">{{ row['dealers'] | format_number }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

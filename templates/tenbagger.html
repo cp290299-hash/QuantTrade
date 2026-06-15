@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>十倍股雷達</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .score-high{color:#00ff00;font-weight:bold;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+</style>
+</head>
+<body>
+<h1>🚀 十倍股候選雷達</h1>
+<a href="/" class="btn">首頁</a>
+<div class="card"><p>⚡ 條件：營收成長>30% / 毛利率成長 / 52週新高 / 爆量 / 空頭比例</p></div>
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>排名</th><th>代號</th><th>價格</th><th>分數</th><th>條件</th></tr>
+        </thead>
+        <tbody>
+            {% for c in candidates %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><a href="/indicators/{{ c.ticker }}" class="stock-link">{{ c.ticker }}</a></td>
+                <td>{{ c.price }}</td>
+                <td class="score-high">{{ c.score }}/6</td>
+                <td>{{ c.conditions|join(', ') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

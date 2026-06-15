@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>盤前戰術板</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    .table-wrapper{overflow-x:auto;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;min-width:800px;}
+    th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #333;vertical-align:top;word-break:break-word;white-space:normal;}
+    th{background:#2a2a35;font-weight:bold;}
+    .positive{color:#00ff00;}.negative{color:#ff4444;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:5px;display:inline-block;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+    .advice{font-size:12px;color:#ffaa66;line-height:1.4;}
+</style>
+</head>
+<body>
+<h1>🗺️ 盤前戰術板 - 美股作戰地圖</h1>
+<div><a href="/" class="btn">返回儀表板</a> <a href="/force_update_gex" class="btn" style="background:#2196f3;">🔄 更新 GEX</a></div>
+<div class="card"><p>⚡ 使用最新 GEX 數據（每小時更新），標示關鍵壓力/支撐區域。操作建議僅供參考。</p></div>
+<div class="table-wrapper">
+    <table>
+        <thead>
+            <tr>
+                <th>代號</th><th>現價</th><th>Call Wall</th><th>Put Wall</th><th>Gamma Flip</th>
+                <th>淨 GEX</th><th>均線趨勢</th><th>AI分數</th><th>戰術建議</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stocks %}
+            <tr>
+                <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+                <td>{{ "${:.2f}".format(s.current_price) if s.current_price else "N/A" }}</td>
+                <td>{{ "${:.2f}".format(s.call_wall) if s.call_wall else "N/A" }}</td>
+                <td>{{ "${:.2f}".format(s.put_wall) if s.put_wall else "N/A" }}</td>
+                <td>{{ "${:.2f}".format(s.gamma_flip) if s.gamma_flip else "N/A" }}</td>
+                <td class="{{ 'positive' if s.net_gex and s.net_gex > 0 else 'negative' if s.net_gex and s.net_gex < 0 else '' }}">{{ "{:,.0f}".format(s.net_gex) if s.net_gex is not none else "N/A" }}</td>
+                <td>{{ s.trend }}</td>
+                <td>{{ s.ai_score }}</td>
+                <td class="advice">{{ s.advice }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

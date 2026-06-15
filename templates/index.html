@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>AI量化監控 - 儀表板</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    .metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:15px;}
+    .metric{background:#2a2a35;padding:10px;border-radius:8px;}
+    table{width:100%;border-collapse:collapse;margin-top:20px;table-layout:fixed;}
+    th,td{padding:8px 6px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .positive{color:#ff4444;}.negative{color:#00ff00;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:5px;display:inline-block;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+    .alert{background:#2a1a1a;border-left:4px solid #ff4444;padding:8px;margin:5px 0;}
+    .toast{position:fixed;bottom:20px;right:20px;background:#333;color:#fff;padding:12px 20px;border-radius:8px;z-index:1000;opacity:0;transition:opacity 0.3s;}
+</style>
+</head>
+<body>
+<h1>🤖 AI 量化監控儀表板</h1>
+<div class="card">
+    <a href="/tw" class="btn">📋 全台股</a>
+    <a href="/us" class="btn">📋 全美股</a>
+    <a href="/ai_ranking" class="btn">🏆 AI 選股排行榜</a>
+    <a href="/tenbagger" class="btn">🚀 十倍股雷達</a>
+    <a href="/positions" class="btn">📊 持倉中心</a>
+    <a href="/bonding" class="btn">📈 均線糾結選股</a>
+    <a href="/gex_screener" class="btn">📊 GEX 篩選器</a>
+    <a href="/battle_map" class="btn">🗺️ 盤前戰術板</a>
+    <a href="/earnings_calendar" class="btn">📅 財報日曆</a>
+    <a href="/institutional" class="btn">🏦 三大法人</a>
+    <a href="/settings" class="btn">⚙️ 設定</a>
+    <a href="/retrain_all" class="btn" style="background:#ff9800;">🔄 重新訓練所有模型</a>
+    <a href="/clear_model_cache" class="btn" style="background:#ff9800;">🗑️ 清除快取</a>
+    <a href="/force_update" class="btn" style="background:#2196f3;">🔄 強制更新</a>
+</div>
+<div class="card">
+    <h2>📊 市場溫度計</h2>
+    <div>市場綜合評分: <strong>{{ market_temp }}/100</strong> - {{ market_status }}</div>
+    <div>VIX: {{ "%.2f"|format(vix) }} | 美債: {{ "%.2f"|format(treasury) }}% | 美元: {{ "%.2f"|format(dollar) }}</div>
+    <div>🇹🇼 台股報價: {{ shioaji_status }}</div>
+</div>
+<div class="card">
+    <h2>📉 崩盤風險監控</h2>
+    <div class="metric-grid">
+        <div class="metric"><strong>📊 巴菲特指標</strong><br>{% if buffett_val %}{{ "%.1f"|format(buffett_val) }}%{% else %}{{ buffett_desc }}{% endif %}<br><a href="{{ buffett_url }}" target="_blank">詳細</a></div>
+        <div class="metric"><strong>😨 VIX</strong><br>{{ "%.2f"|format(vix) }}<br>{% if vix > 30 %}🔴極度恐慌{% elif vix > 20 %}🟡恐慌升溫{% else %}🟢平靜{% endif %}</div>
+        <div class="metric"><strong>😱 恐懼貪婪</strong><br>{{ fear_greed_score }}/100 - {{ fear_greed_level }}<br><a href="{{ fear_greed_url }}" target="_blank">走勢</a></div>
+        <div class="metric"><strong>📉 殖利率曲線</strong><br>{% if yield_spread %}{{ "%.2f"|format(yield_spread) }}%<br>{{ yield_text }}{% else %}N/A{% endif %}</div>
+        <div class="metric"><strong>💰 融資餘額</strong><br>{{ margin_balance }}<br>{{ margin_ratio }}<br><a href="{{ margin_url }}" target="_blank">查詢</a></div>
+    </div>
+</div>
+<div class="card">
+    <h2>🏭 產業輪動</h2>
+    美股: {% for n,r in us_sector_perf %}{{ n }}:{{ r }}% {% endfor %}<br>
+    台股: {% for n,r in tw_sector_perf %}{{ n }}:{{ r }}% {% endfor %}
+</div>
+<div class="card">
+    <h2>🚨 警報</h2>
+    {% for a in alerts %}<div class="alert">🚨 {{ a.ticker }} - {{ a.message }}</div>{% else %}無{% endfor %}
+</div>
+
+<!-- 台股 AI 前10 表格 -->
+<div class="card">
+    <h2>🇹🇼 台股 AI前10</h2>
+    <table>
+        <thead>
+            <tr><th>代號</th><th>價格</th><th>漲跌</th><th>AI分數</th><th>訊號</th></tr>
+        </thead>
+        <tbody>
+            {% for s in tw_stocks %}
+            <tr>
+                <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+                <td>{{ s.price }}</td>
+                <td class="{{ 'positive' if s.pct>=0 else 'negative' }}">{{ s.pct }}%</td>
+                <td style="color: {{ '#00ff00' if s.ai_score>=70 else '#ffcc00' if s.ai_score>=50 else '#ff4444' }}">{{ s.ai_score }}</td>
+                <td>{{ s.signal }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 美股 AI 前10 表格 -->
+<div class="card">
+    <h2>🇺🇸 美股 AI前10</h2>
+    <table>
+        <thead>
+            <tr><th>代號</th><th>價格</th><th>漲跌</th><th>AI分數</th><th>訊號</th></tr>
+        </thead>
+        <tbody>
+            {% for s in us_stocks %}
+            <tr>
+                <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+                <td>{{ s.price }}</td>
+                <td class="{{ 'positive' if s.pct>=0 else 'negative' }}">{{ s.pct }}%</td>
+                <td style="color: {{ '#00ff00' if s.ai_score>=70 else '#ffcc00' if s.ai_score>=50 else '#ff4444' }}">{{ s.ai_score }}</td>
+                <td>{{ s.signal }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div id="toast" class="toast"></div>
+<script>
+<div id="toast" class="toast"></div>
+<script>
+if(typeof EventSource !== 'undefined'){
+    var source = new EventSource('/alert_stream');
+    source.onmessage = function(event){
+        var toast = document.getElementById('toast');
+        toast.innerHTML = event.data;
+        toast.style.opacity = 1;
+        setTimeout(function(){ toast.style.opacity = 0; }, 5000);
+    };
+}
+</script></body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "refresh_seconds": 60,
+  "bonding_threshold": 3.0,
+  "enable_ensemble": true,
+  "prediction_days": 3,
+  "train_days": 180,
+  "retrain_hours": 24,
+  "auto_clear_cache_hours": 24,
+  "background_update_minutes": 5,
+  "cache_ttl_minutes": 5,
+  "max_loss_per_trade": 5.0,
+  "max_loss_per_day": 10.0,
+  "max_concentration": 40.0,
+  "cash_balance": 0.0
+}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>持倉中心</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{padding:8px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .positive{color:#00ff00;}.negative{color:#ff4444;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+</style>
+</head>
+<body>
+<h1>📊 持倉管理</h1>
+<a href="/" class="btn">首頁</a>
+<div class="card">
+    <form method="POST" action="/add_position">
+        <input name="pos_ticker" placeholder="代號" required>
+        <input name="cost" placeholder="成本" step="0.01" required>
+        <input name="shares" placeholder="股數" required>
+        <button type="submit" class="btn">新增/更新</button>
+    </form>
+</div>
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>代號</th><th>股數</th><th>成本</th><th>現價</th><th>市值</th><th>損益</th><th>報酬率</th><th>停損價</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+            {% for p in positions %}
+            <tr>
+                <td><a href="/indicators/{{ p.ticker }}" class="stock-link">{{ p.ticker }}</a></td>
+                <td>{{ p.shares }}</td>
+                <td>{{ p.cost }}</td>
+                <td>{{ p.current_price }}</td>
+                <td>{{ p.value }}</td>
+                <td class="{{ 'positive' if p.profit>=0 else 'negative' }}">{{ p.profit }}</td>
+                <td>{{ p.profit_pct }}%</td>
+                <td>{{ p.stop_loss }}</td>
+                <td><a href="/clear_position/{{ p.ticker }}" class="btn" style="background:#ff4444;">歸零</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>AI選股排行榜</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:5px;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+</style>
+</head>
+<body>
+<h1>🏆 AI 共振評分排行榜</h1>
+<a href="/" class="btn">返回首頁</a>
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>排名</th><th>代號</th><th>市場</th><th>價格</th><th>AI分數</th><th>趨勢</th><th>買賣訊號</th></tr>
+        </thead>
+        <tbody>
+            {% for s in stocks %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+                <td>{{ '台股' if s.market=='tw' else '美股' }}</td>
+                <td>{{ s.price }}</td>
+                <td style="color: {{ '#00ff00' if s.ai_score>=70 else '#ffcc00' if s.ai_score>=50 else '#ff4444' }}">{{ s.ai_score }}/100</td>
+                <td>{{ s.trend }}</td>
+                <td>{{ s.signal }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

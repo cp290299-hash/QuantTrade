@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>{{ title }}</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    .index-grid{display:flex;gap:15px;flex-wrap:wrap;margin-bottom:20px;}
+    .index-item{background:#2a2a35;padding:8px 15px;border-radius:8px;}
+    .positive{color:#ff4444;}.negative{color:#00ff00;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{padding:10px 8px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:5px;display:inline-block;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+</style>
+</head>
+<body>
+<h1>{{ title }}</h1>
+<div><a href="/" class="btn">返回儀表板</a> <a href="/ai_ranking" class="btn">🏆 AI排行榜</a></div>
+<div class="card">
+    <div class="index-grid">
+        <div class="index-item">📊 加權: {{ tw_curr }} <span class="{{ 'positive' if tw_pct>=0 else 'negative' }}">{{ tw_change }}點, {{ tw_pct }}%</span></div>
+        <div class="index-item">📊 櫃買: {{ otc_curr }} <span class="{{ 'positive' if otc_pct>=0 else 'negative' }}">{{ otc_change }}點, {{ otc_pct }}%</span></div>
+        <div class="index-item">📊 道瓊: {{ dow_curr }} <span class="{{ 'positive' if dow_pct>=0 else 'negative' }}">{{ dow_change }}點, {{ dow_pct }}%</span></div>
+        <div class="index-item">📊 那斯達克: {{ nas_curr }} <span class="{{ 'positive' if nas_pct>=0 else 'negative' }}">{{ nas_change }}點, {{ nas_pct }}%</span></div>
+        <div class="index-item">📊 費半: {{ sox_curr }} <span class="{{ 'positive' if sox_pct>=0 else 'negative' }}">{{ sox_change }}點, {{ sox_pct }}%</span></div>
+    </div>
+</div>
+<div class="card">
+    <form method="POST" action="/add_stock_{{ market }}">
+        <input name="ticker" placeholder="股票代號" required>
+        <button type="submit" class="btn">➕ 加入自選</button>
+    </form>
+</div>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>代號</th><th>價格</th><th>漲跌</th>
+                <th>類型</th><th>AI分數</th><th>趨勢</th>
+                <th>訊號</th><th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stocks %}
+            <tr>
+                <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+                <td>{{ s.price }}</td>
+                <td class="{{ 'positive' if s.pct>=0 else 'negative' }}">{{ s.pct }}%</td>
+                <td>{% if market == 'tw' %}{% if shioaji_status == '🟢 即時模式' %}🟢 即時{% else %}🔴 延遲{% endif %}{% else %}🔵 延遲 15分{% endif %}</td>
+                <td>{{ s.ai_score }}</td>
+                <td>{{ s.trend }}</td>
+                <td>{{ s.signal }}</td>
+                <td><a href="/delete/{{ market }}/{{ s.ticker }}" class="btn" style="background:#ff4444;">刪除</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

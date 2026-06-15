@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>美股財報日曆</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:5px;display:inline-block;}
+    .warning{color:#ff4444;}.caution{color:#ffaa00;}
+</style>
+</head>
+<body>
+<h1>📅 美股財報時間表</h1>
+<div><a href="/" class="btn">返回儀表板</a> <a href="/force_update_earnings" class="btn" style="background:#4caf50;">🔄 更新財報快取</a></div>
+<div class="card"><p>⚡ 財報日期來自 Yahoo Finance，可能略有誤差。預期波動為 ATM Straddle 估算百分比。</p></div>
+<div class="card">
+    <table>
+        <thead>
+            <tr><th>代號</th><th>財報日期</th><th>狀態</th><th>預期波動 (%)</th></tr>
+        </thead>
+       <tbody>
+    {% for s in stocks %}
+    <tr>
+        <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+        <td>{{ s.date }}</td>
+        <td class="{% if '今日' in s.status or ('天後' in s.status and '高風險' in s.status) %}warning{% elif '天後' in s.status %}caution{% endif %}">{{ s.status }}</td>
+        <td>{% if s.expected_move is not none %}{{ "%.2f"|format(s.expected_move) }}%{% else %}N/A{% endif %}</td>
+    </tr>
+    {% endfor %}
+</tbody>
+    </table>
+</div>
+</body>
+</html>

@@ -1,0 +1,277 @@
+{
+  "SQQQ": {
+    "date": null,
+    "expected_move": 7.89,
+    "last_updated": 1781390181.4984558
+  },
+  "NXPI": {
+    "date": "2026-07-28",
+    "expected_move": 6.27,
+    "last_updated": 1781390182.3852606
+  },
+  "NOK": {
+    "date": "2026-07-23",
+    "expected_move": 8.31,
+    "last_updated": 1781390183.3038437
+  },
+  "PLTR": {
+    "date": "2026-08-04",
+    "expected_move": 5.0,
+    "last_updated": 1781390184.4896052
+  },
+  "OKLO": {
+    "date": "2026-08-11",
+    "expected_move": 8.71,
+    "last_updated": 1781390185.7252207
+  },
+  "BE": {
+    "date": "2026-04-29",
+    "expected_move": 10.89,
+    "last_updated": 1781390186.589347
+  },
+  "META": {
+    "date": "2026-07-30",
+    "expected_move": 1.92,
+    "last_updated": 1781390187.3041298
+  },
+  "AAPL": {
+    "date": "2026-07-31",
+    "expected_move": 1.34,
+    "last_updated": 1781390188.1546242
+  },
+  "TSM": {
+    "date": "2026-07-16",
+    "expected_move": 4.7,
+    "last_updated": 1781390188.991648
+  },
+  "AMZN": {
+    "date": "2026-07-31",
+    "expected_move": 1.85,
+    "last_updated": 1781390189.6955376
+  },
+  "USAR": {
+    "date": "2026-08-11",
+    "expected_move": 10.14,
+    "last_updated": 1781390190.6013083
+  },
+  "AMD": {
+    "date": "2026-08-05",
+    "expected_move": 7.81,
+    "last_updated": 1781390191.3572905
+  },
+  "NVDA": {
+    "date": "2026-08-27",
+    "expected_move": 1.91,
+    "last_updated": 1781390192.366679
+  },
+  "INTC": {
+    "date": "2026-07-24",
+    "expected_move": 9.49,
+    "last_updated": 1781390193.5675275
+  },
+  "MU": {
+    "date": "2026-06-25",
+    "expected_move": 10.35,
+    "last_updated": 1781390194.8555596
+  },
+  "LLY": {
+    "date": "2026-08-05",
+    "expected_move": 3.28,
+    "last_updated": 1781390195.978305
+  },
+  "SOUN": {
+    "date": "2026-08-07",
+    "expected_move": 7.97,
+    "last_updated": 1781390196.7360706
+  },
+  "TSLA": {
+    "date": "2026-07-23",
+    "expected_move": 3.29,
+    "last_updated": 1781390197.715262
+  },
+  "GLW": {
+    "date": "2026-07-28",
+    "expected_move": 8.14,
+    "last_updated": 1781390198.731628
+  },
+  "QCOM": {
+    "date": "2026-07-30",
+    "expected_move": 7.85,
+    "last_updated": 1781390199.489137
+  },
+  "VTRS": {
+    "date": "2026-08-06",
+    "expected_move": 4.37,
+    "last_updated": 1781390200.3924289
+  },
+  "COIN": {
+    "date": "2026-07-31",
+    "expected_move": 7.09,
+    "last_updated": 1781390201.243502
+  },
+  "INOD": {
+    "date": "2026-07-31",
+    "expected_move": 10.89,
+    "last_updated": 1781390202.0516522
+  },
+  "PLDR": {
+    "date": null,
+    "expected_move": null,
+    "last_updated": 1781390202.7175384
+  },
+  "CRWV": {
+    "date": "2026-05-08",
+    "expected_move": 9.4,
+    "last_updated": 1781390203.519223
+  },
+  "NOW": {
+    "date": "2026-07-23",
+    "expected_move": 6.28,
+    "last_updated": 1781390204.4652574
+  },
+  "ADBE": {
+    "date": "2026-09-11",
+    "expected_move": 4.23,
+    "last_updated": 1781390205.3176107
+  },
+  "CRM": {
+    "date": "2026-09-03",
+    "expected_move": 4.52,
+    "last_updated": 1781390206.0923586
+  },
+  "AXON": {
+    "date": "2026-08-04",
+    "expected_move": 6.11,
+    "last_updated": 1781390206.8540998
+  },
+  "MRVL": {
+    "date": "2026-08-28",
+    "expected_move": 10.94,
+    "last_updated": 1781390207.8956323
+  },
+  "SNDK": {
+    "date": "2026-08-25",
+    "expected_move": 10.46,
+    "last_updated": 1781390208.8410342
+  },
+  "LITE": {
+    "date": "2026-08-13",
+    "expected_move": 9.75,
+    "last_updated": 1781390209.778295
+  },
+  "COHR": {
+    "date": "2026-05-07",
+    "expected_move": 9.88,
+    "last_updated": 1781390210.7364552
+  },
+  "MPWR": {
+    "date": "2026-07-31",
+    "expected_move": 8.08,
+    "last_updated": 1781390211.555502
+  },
+  "ADI": {
+    "date": "2026-08-19",
+    "expected_move": 4.62,
+    "last_updated": 1781390212.2833812
+  },
+  "VRT": {
+    "date": "2026-07-29",
+    "expected_move": 6.28,
+    "last_updated": 1781390213.123072
+  },
+  "DELL": {
+    "date": "2026-09-04",
+    "expected_move": 7.32,
+    "last_updated": 1781390213.9344578
+  },
+  "SMCI": {
+    "date": "2026-08-05",
+    "expected_move": 9.82,
+    "last_updated": 1781390214.8631344
+  },
+  "CIEN": {
+    "date": "2026-06-04",
+    "expected_move": 9.23,
+    "last_updated": 1781390215.7593513
+  },
+  "TXN": {
+    "date": "2026-07-23",
+    "expected_move": 5.24,
+    "last_updated": 1781390216.694656
+  },
+  "IFNNY": {
+    "date": "2026-08-05",
+    "expected_move": null,
+    "last_updated": 1781390217.1078305
+  },
+  "STX": {
+    "date": "2026-07-29",
+    "expected_move": 8.4,
+    "last_updated": 1781390217.8028543
+  },
+  "VSH": {
+    "date": "2026-08-05",
+    "expected_move": 13.52,
+    "last_updated": 1781390218.4623435
+  },
+  "WDC": {
+    "date": "2026-07-30",
+    "expected_move": 4.44,
+    "last_updated": 1781390219.249321
+  },
+  "ASTS": {
+    "date": "2026-08-11",
+    "expected_move": 13.82,
+    "last_updated": 1781390219.9740562
+  },
+  "VST": {
+    "date": "2026-08-06",
+    "expected_move": 4.8,
+    "last_updated": 1781390220.632341
+  },
+  "RKLB": {
+    "date": "2026-08-07",
+    "expected_move": 11.09,
+    "last_updated": 1781390221.2916625
+  },
+  "SOFI": {
+    "date": "2026-07-28",
+    "expected_move": 5.85,
+    "last_updated": 1781390221.9334128
+  },
+  "RXRX": {
+    "date": "2026-08-05",
+    "expected_move": 11.43,
+    "last_updated": 1781390222.5303423
+  },
+  "AVGO": {
+    "date": "2026-09-04",
+    "expected_move": 3.11,
+    "last_updated": 1781390223.1750007
+  },
+  "HPE": {
+    "date": "2026-06-02",
+    "expected_move": 8.1,
+    "last_updated": 1781390223.9114723
+  },
+  "NASA": {
+    "date": null,
+    "expected_move": 9.24,
+    "last_updated": 1781390224.579512
+  },
+  "AI": {
+    "date": "2026-06-04",
+    "expected_move": 7.43,
+    "last_updated": 1781390225.3831189
+  },
+  "SPCX": {
+    "date": null,
+    "expected_move": 0.62,
+    "last_updated": 1781390226.1732836
+  },
+  "SPCX-USDC": {
+    "date": null,
+    "expected_move": null,
+    "last_updated": 1781390226.8344781
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "00632R": {
+    "last_train": "2026-06-05T11:14:58.192033",
+    "metrics": {}
+  },
+  "AAPL": {
+    "last_train": "2026-06-05T11:15:31.241463",
+    "metrics": {}
+  },
+  "INTC": {
+    "RF": {
+      "predictions": [
+        {
+          "timestamp": 1780820103.6484907,
+          "pred_prob": 62.35516129640537,
+          "pred_direction": "up",
+          "price_at_pred": 99.16999816894531,
+          "actual_return": null,
+          "correct": null,
+          "resolved": false
+        }
+      ],
+      "win_rate": 0.5,
+      "last_updated": 1780820103.6484876
+    },
+    "XGB": {
+      "predictions": [
+        {
+          "timestamp": 1780820103.6721876,
+          "pred_prob": 

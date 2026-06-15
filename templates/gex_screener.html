@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>GEX 篩選器 - 美股淨 Gamma Exposure</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{padding:10px;text-align:left;border-bottom:1px solid #333;word-break:break-word;}
+    th{background:#2a2a35;}
+    .positive{color:#00ff00;}.negative{color:#ff4444;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:5px;display:inline-block;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+</style>
+</head>
+<body>
+<h1>📊 美股 Gamma Exposure (GEX) 篩選器</h1>
+<div><a href="/" class="btn">返回儀表板</a> <a href="/force_update_gex" class="btn" style="background:#2196f3;">🔄 手動更新</a></div>
+<div class="card"><p>⭐ 淨 GEX = 正 GEX (Call) + 負 GEX (Put)，數值越大代表做市商越可能在該價位提供流動性。</p></div>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>代號</th><th>現價</th><th>淨 GEX</th><th>正 GEX</th>
+                <th>負 GEX</th><th>Call Wall</th><th>Put Wall</th><th>Gamma Flip</th><th>更新時間</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in stocks %}
+            <tr>
+                <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+                <td>{{ "${:.2f}".format(s.current_price) if s.current_price else "N/A" }}</td>
+                <td class="{{ 'positive' if s.net_gex and s.net_gex > 0 else 'negative' if s.net_gex and s.net_gex < 0 else '' }}">{{ "{:,.0f}".format(s.net_gex) if s.net_gex is not none else "N/A" }}</td>
+                <td>{{ "{:,.0f}".format(s.positive_gex) if s.positive_gex is not none else "N/A" }}</td>
+                <td>{{ "{:,.0f}".format(s.negative_gex) if s.negative_gex is not none else "N/A" }}</td>
+                <td>{{ "${:.2f}".format(s.call_wall) if s.call_wall else "N/A" }}</td>
+                <td>{{ "${:.2f}".format(s.put_wall) if s.put_wall else "N/A" }}</td>
+                <td>{{ "${:.2f}".format(s.gamma_flip) if s.gamma_flip else "N/A" }}</td>
+                <td>{{ s.last_update_str }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

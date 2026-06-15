@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>均線糾結選股</title>
+<style>
+    body{background:#121214;color:#fff;font-family:sans-serif;padding:20px;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;table-layout:fixed;}
+    th,td{border:1px solid #444;padding:8px;text-align:left;word-break:break-word;}
+    th{background:#2a2a35;}
+    .stock-link{color:#ffcc00;text-decoration:none;font-weight:bold;background:#333;padding:2px 6px;border-radius:4px;}
+    .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;}
+</style>
+</head>
+<body>
+<h1>📈 均線糾結選股</h1>
+<div class="note">📊 糾結閾值: {{ threshold }}%</div>
+<div class="card"><h2>🇹🇼 台股 ({{ tw_count }})</h2>
+{% if tw_results %}
+<table>
+    <thead><th>代號</th><th>價格</th><th>糾結度%</th><th>MA5</th><th>MA20</th><th>MA60</th><th>方向</th></tr></thead>
+    <tbody>
+    {% for s in tw_results %}
+    <tr>
+        <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+        <td>{{ s.price }}</td>
+        <td>{{ s.spread }}%</td>
+        <td>{{ s.ma5 }}</td>
+        <td>{{ s.ma20 }}</td>
+        <td>{{ s.ma60 }}</td>
+        <td>{{ s.direction }}{% if s.volume_confirm %}📊{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}<p>無</p>{% endif %}
+</div>
+<div class="card"><h2>🇺🇸 美股 ({{ us_count }})</h2>
+{% if us_results %}
+<table>
+    <thead><th>代號</th><th>價格</th><th>糾結度%</th><th>MA5</th><th>MA20</th><th>MA60</th><th>方向</th></tr></thead>
+    <tbody>
+    {% for s in us_results %}
+    <tr>
+        <td><a href="/indicators/{{ s.ticker }}" class="stock-link">{{ s.ticker }}</a></td>
+        <td>{{ s.price }}</td>
+        <td>{{ s.spread }}%</td>
+        <td>{{ s.ma5 }}</td>
+        <td>{{ s.ma20 }}</td>
+        <td>{{ s.ma60 }}</td>
+        <td>{{ s.direction }}{% if s.volume_confirm %}📊{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}<p>無</p>{% endif %}
+</div>
+<a href="/" class="btn">返回首頁</a>
+</body>
+</html>
