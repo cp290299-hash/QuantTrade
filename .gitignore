@@ -6,4 +6,5 @@ logs/
 models/
 scalers/
 __pycache__/
-.env
+.env"models/" 
+"scalers/" 
