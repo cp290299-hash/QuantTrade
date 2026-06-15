@@ -2607,23 +2607,20 @@ def institutional_view():
     '''
     return html
 
-# ================== 加密貨幣即時報價（ccxt） ==================
 import ccxt
 
 def get_crypto_price_ccxt(symbol, exchange='binance'):
     try:
-        exchange_class = getattr(ccxt, exchange)
-        ex = exchange_class()
-        ticker = ex.fetch_ticker(symbol)
-        price = ticker.get('last') or ticker.get('ask')
-        return price
+        ex = getattr(ccxt, exchange)()
+        ticker = ex.fetch_ticker(symbol.upper())
+        return ticker.get('last') or ticker.get('ask')
     except Exception as e:
         print(f"ccxt error: {e}")
         return None
 
 @app.route('/crypto_price/<symbol>')
 def crypto_price(symbol):
-    price = get_crypto_price_ccxt(symbol.upper())
+    price = get_crypto_price_ccxt(symbol)
     if price:
         return jsonify({'symbol': symbol.upper(), 'price': price})
     else:
