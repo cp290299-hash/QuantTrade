@@ -1,32 +1,9 @@
-# 資料庫檔案
-*.db
-*.sqlite3
-data/*.db
-
-# 日誌檔案
-logs/
+*.exe
 *.log
-quant_log.txt
-
-# 憑證檔案（我們需要上傳 Sinopac.pfx，所以不要排除它，但如果你不想上傳可以取消註解）
-# Sinopac.pfx
-
-# 環境變數檔案
-.env
-
-# Python 快取
+*.db
+data/*.db
+logs/
+models/
+scalers/
 __pycache__/
-*.pyc
-# 忽略所有 .exe 文件
-*.exe
-# 排除所有 exe 文件
-*.exe
-# 排除日志和?据?
-*.log
-*.db
-logs/
-data/*.db
-# 排除?据文件（但如果你需要 Sinopac.pfx，?去掉下面?行的注?）
-# Sinopac.pfx
-# 排除?境?量文件
 .env

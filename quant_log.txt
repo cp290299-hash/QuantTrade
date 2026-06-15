@@ -1,0 +1,30 @@
+python-dotenv could not parse statement starting at line 10
+python-dotenv could not parse statement starting at line 11
+python-dotenv could not parse statement starting at line 13
+python-dotenv could not parse statement starting at line 14
+python-dotenv could not parse statement starting at line 16
+python-dotenv could not parse statement starting at line 19
+python-dotenv could not parse statement starting at line 20
+2026-06-15 09:23:12,631 - INFO - 三大法人資料庫初始化完成
+2026-06-15 09:23:12,637 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 09:23:12,637 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 09:23:12,637 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 09:23:12,638 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 09:23:12,638 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-15 09:23:18,609 - INFO - 成功抓取 00632R.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:18,623 - INFO - 更新 00632R.TW (20260612) 三大法人: 外資=2807000, 投信=1889000, 自營=0
+2026-06-15 09:23:23,607 - INFO - 成功抓取 1325.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:23,623 - INFO - 更新 1325.TW (20260612) 三大法人: 外資=31000, 投信=179000, 自營=0
+2026-06-15 09:23:28,516 - INFO - 成功抓取 9919.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:28,534 - INFO - 更新 9919.TW (20260612) 三大法人: 外資=51194, 投信=305806, 自營=0
+2026-06-15 09:23:33,427 - INFO - 成功抓取 2615.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:33,446 - INFO - 更新 2615.TW (20260612) 三大法人: 外資=1713777, 投信=5518350, 自營=0
+2026-06-15 09:23:38,474 - INFO - 成功抓取 2427.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:38,492 - INFO - 更新 2427.TW (20260612) 三大法人: 外資=127000, 投信=152000, 自營=0
+2026-06-15 09:23:44,113 - INFO - 成功抓取 2330.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:44,129 - INFO - 更新 2330.TW (20260612) 三大法人: 外資=15379522, 投信=3927424, 自營=0
+2026-06-15 09:23:50,439 - INFO - 成功抓取 2317.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:50,457 - INFO - 更新 2317.TW (20260612) 三大法人: 外資=28099133, 投信=1952094, 自營=0
+2026-06-15 09:23:56,451 - INFO - 成功抓取 1301.TW 在 20260612 的三大法人資料
+2026-06-15 09:23:56,469 - INFO - 更新 1301.TW (20260612) 三大法人: 外資=8062327, 投信=5946952, 自營=0
+^C
