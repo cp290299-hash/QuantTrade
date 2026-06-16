@@ -2680,9 +2680,9 @@ if __name__ == "__main__":
         # update_large_shareholders_data(t)
     print("手動更新完成")
     # ========== 手動測試結束 ==========
-        # 啟動 Shioaji WebSocket 即時訂閱
-    # init_shioaji_websocket()   # 暂时禁用，避免启动错误
-    
+             
+    # 啟動 WebSocket 即時訂閱（獨立執行緒）
+    threading.Thread(target=start_websocket_stream, daemon=True).start()
 
     scheduler.start()
     
