@@ -2437,13 +2437,20 @@ def indicators_page(ticker):
     # 分析異常期權的 Delta 值
     delta_analysis = analyze_unusual_options(ticker, unusual_opt)
 
-        # 取得異常期權（僅美股有）
-    if market == 'us':
+  
             # 取得異常期權（僅美股有）
     if market == 'us':
-        unusual_opt = get_unusual_options(ticker)
+        
+
+
+
+       unusual_opt = get_unusual_options(ticker)
     else:
-        unusual_opt = []   # 台股或沒有期權的股票，設為空列表
+        
+
+
+
+       unusual_opt = []   # 台股或沒有期權的股票，設為空列表
     
     ai_signal = ensemble[1] if ensemble[1] else None
     tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
