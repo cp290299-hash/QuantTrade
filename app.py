@@ -24,8 +24,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import joblib, numpy as np, pandas as pd
 from scipy.stats import norm
-from py_vollib.black_scholes import black_scholes as bs
-from py_vollib.black_scholes.greeks.analytical import delta
+from vollib.black_scholes import black_scholes as bs
+from vollib.black_scholes.greeks.analytical import delta
 import sqlite3
 from contextlib import closing
 
@@ -1573,27 +1573,52 @@ def analyze_unusual_options(ticker, unusual_options):
         return []
     import re
     import yfinance as yf
-    stock = yf.Ticker(ticker)
-    hist = stock.history(period="1d")
-    if hist.empty:
-        return [{"summary": "無法獲取股價"}]
-    current_price = hist['Close'].iloc[-1]
-
-    analysis = []
-    for opt in unusual_options:
-        match = re.search(r'Call \$([\d.]+)', opt)
-        if not match:
-            continue
-        strike = float(match.group(1))
-        # 需要到期日，此處用最近可用的到期日（可改進）
-        exps = stock.options
+    try:
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="1d")
+        if hist.empty:
+            return [{"summary": "無法獲取股價"}]
+        current_price = hist['Close'].iloc[-1]
+        try:
+            exps = stock.options
+        except Exception as e:
+            return [{"summary": f"無法獲取期權到期日: {e}"}]
         if not exps:
-            continue
-        expiration_date = exps[0]  # 取最近到期日
-        delta_val = calculate_option_delta(ticker, expiration_date, strike, 'call')
-        if delta_val is None:
-            continue
+            return [{"summary": "該股票目前無期權數據"}]
 
+        analysis = []
+        for opt in unusual_options:
+            match = re.search(r'Call \$([\d.]+)', opt)
+            if not match:
+                continue
+            strike = float(match.group(1))
+            expiration_date = exps[0]
+            try:
+                delta_val = calculate_option_delta(ticker, expiration_date, strike, 'call')
+            except Exception as e:
+                print(f"計算 Delta 失敗: {e}")
+                delta_val = None
+            if delta_val is None:
+                continue
+            # 修正：與 current_price 比較
+            moneyness = "價內" if strike < current_price else "價外" if strike > current_price else "價平"
+            if delta_val >= 0.7:
+                strength = "高敏感（深度價內）"
+            elif delta_val >= 0.4:
+                strength = "中敏感（價平附近）"
+            else:
+                strength = "低敏感（深度價外）"
+            analysis.append({
+                'strike': strike,
+                'delta': delta_val,
+                'moneyness': moneyness,
+                'strength': strength,
+                'summary': f"Call ${strike:.1f} → Delta={delta_val:.2f} ({moneyness}，{strength})"
+            })
+        return analysis
+    except Exception as e:
+        print(f"analyze_unusual_options 整體錯誤: {e}")
+        return [{"summary": f"分析過程中發生錯誤: {str(e)}"}]
         # 判斷價內/價外
         moneyness = "價內" if strike < current_price else "價外" if strike > current_price else "價平"
         # 判斷 Delta 強度
