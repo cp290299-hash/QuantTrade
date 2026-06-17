@@ -23,6 +23,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import joblib, numpy as np, pandas as pd
+from scipy.stats import norm
+from py_vollib.black_scholes import black_scholes as bs
+from py_vollib.black_scholes.greeks.analytical import delta
 import sqlite3
 from contextlib import closing
 
@@ -1516,6 +1519,98 @@ def generate_tactical_advice(current_price, call_wall, put_wall, gamma_flip, ma_
         advice.append(f"📢 異常期權: {unusual_options}")
     if not advice: return "⚖️ 區間震盪"
     return " | ".join(advice)
+def calculate_option_delta(ticker, expiration_date, strike, option_type='call'):
+    """
+    計算特定期權的 Delta 值
+    - ticker: 股票代號（如 AAPL）
+    - expiration_date: 到期日（YYYY-MM-DD）
+    - strike: 履約價
+    - option_type: 'call' 或 'put'
+    """
+    try:
+        import yfinance as yf
+        from datetime import datetime
+        import numpy as np
+        from scipy.stats import norm
+
+        stock = yf.Ticker(ticker)
+        hist = stock.history(period="1d")
+        if hist.empty:
+            return None
+        current_price = hist['Close'].iloc[-1]
+
+        # 計算到期天數（年化）
+        expiry = datetime.strptime(expiration_date, '%Y-%m-%d')
+        T = (expiry - datetime.now()).days / 365
+        if T <= 0:
+            return None
+
+        # 獲取歷史波動率（使用 60 天年化波動率）
+        hist_data = stock.history(period="60d")
+        if len(hist_data) < 2:
+            sigma = 0.3  # 預設值
+        else:
+            sigma = hist_data['Close'].pct_change().dropna().std() * np.sqrt(252)
+
+        # 無風險利率（此處使用 4.2% 近似）
+        r = 0.042
+
+        # 計算 Delta
+        d1 = (np.log(current_price / strike) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+        if option_type.lower() == 'call':
+            delta_val = norm.cdf(d1)
+        else:  # put
+            delta_val = norm.cdf(d1) - 1
+
+        return round(delta_val, 4)
+    except Exception as e:
+        print(f"計算 Delta 失敗: {e}")
+        return None
+
+def analyze_unusual_options(ticker, unusual_options):
+    """分析異常期權，輸出 Delta、價內/價外狀態與綜合判斷"""
+    if not unusual_options:
+        return []
+    import re
+    import yfinance as yf
+    stock = yf.Ticker(ticker)
+    hist = stock.history(period="1d")
+    if hist.empty:
+        return [{"summary": "無法獲取股價"}]
+    current_price = hist['Close'].iloc[-1]
+
+    analysis = []
+    for opt in unusual_options:
+        match = re.search(r'Call \$([\d.]+)', opt)
+        if not match:
+            continue
+        strike = float(match.group(1))
+        # 需要到期日，此處用最近可用的到期日（可改進）
+        exps = stock.options
+        if not exps:
+            continue
+        expiration_date = exps[0]  # 取最近到期日
+        delta_val = calculate_option_delta(ticker, expiration_date, strike, 'call')
+        if delta_val is None:
+            continue
+
+        # 判斷價內/價外
+        moneyness = "價內" if strike < current_price else "價外" if strike > current_price else "價平"
+        # 判斷 Delta 強度
+        if delta_val >= 0.7:
+            strength = "高敏感（深度價內）"
+        elif delta_val >= 0.4:
+            strength = "中敏感（價平附近）"
+        else:
+            strength = "低敏感（深度價外）"
+        analysis.append({
+            'strike': strike,
+            'delta': delta_val,
+            'moneyness': moneyness,
+            'strength': strength,
+            'summary': f"Call ${strike:.1f} → Delta={delta_val:.2f} ({moneyness}，{strength})"
+        })
+    return analysis
 
 def get_unusual_options(ticker):
     try:
@@ -2339,6 +2434,8 @@ def indicators_page(ticker):
         gex_flip = gex_data.get('gamma_flip_strike')
     else:
         gex_call = gex_put = gex_flip = None
+    # 分析異常期權的 Delta 值
+    delta_analysis = analyze_unusual_options(ticker, unusual_opt)
 
     unusual_opt = get_unusual_options(ticker)
     ai_signal = ensemble[1] if ensemble[1] else None
@@ -2376,7 +2473,7 @@ def indicators_page(ticker):
                            ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
                            ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
                            gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                           unusual_options=unusual_opt, institutional_data=inst_display, institutional_score=inst_score)
+                           unusual_options=unusual_opt, delta_analysis=delta_analysis)institutional_data=inst_display, institutional_score=inst_score)
 @app.route('/bonding')
 def bonding_page():
     threshold = settings.get('bonding_threshold',3.0)/100
