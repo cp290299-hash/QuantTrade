@@ -2625,6 +2625,58 @@ def crypto_price(symbol):
         return jsonify({'symbol': symbol.upper(), 'price': price})
     else:
         return jsonify({'error': f'無法獲取 {symbol} 價格'}), 500
+
+# ================== Shioaji WebSocket 即時報價 ==================
+import shioaji as sj
+import threading
+import time
+
+latest_quote = {}
+quote_lock = threading.Lock()
+
+def start_websocket_stream():
+    """啟動 Shioaji WebSocket 訂閱即時報價"""
+    global latest_quote
+    try:
+        api = sj.Shioaji(simulation=False)
+        api.login(
+            api_key=os.getenv('SHIOAJI_API_KEY'),
+            secret_key=os.getenv('SHIOAJI_SECRET_KEY')
+        )
+        api.activate_ca(
+            ca_path="Sinopac.pfx",
+            ca_passwd=os.getenv('CA_PASSWD', '你的身份證字號'),
+            person_id=os.getenv('CA_PASSWD', '你的身份證字號')
+        )
+        print("Shioaji 已登入並啟用憑證")
+
+        @api.quote.on_tick_stk_v1
+        def quote_callback(exchange, tick):
+            with quote_lock:
+                latest_quote[tick.code] = {
+                    'price': float(tick.close),
+                    'volume': tick.volume,
+                    'total_volume': tick.total_volume,
+                    'datetime': str(tick.datetime)
+                }
+
+        tickers = get_all_tickers('tw')
+        for ticker in tickers:
+            stock_id = ticker.replace('.TW', '')
+            try:
+                contract = api.Contracts.Stocks[stock_id]
+                api.quote.subscribe(contract, quote_type=sj.constant.QuoteType.Tick)
+                print(f"已訂閱 {ticker}")
+            except Exception as e:
+                print(f"訂閱 {ticker} 失敗: {e}")
+
+        # 保持執行（WebSocket 在背景執行）
+        while True:
+            time.sleep(1)
+    except Exception as e:
+        print(f"WebSocket 啟動失敗: {e}")
+
+
 # ================== 主程式 ==================
 if __name__ == "__main__":
     debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
