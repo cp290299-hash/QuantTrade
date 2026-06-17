@@ -2437,10 +2437,21 @@ def indicators_page(ticker):
     # 分析異常期權的 Delta 值
     delta_analysis = analyze_unusual_options(ticker, unusual_opt)
 
-    unusual_opt = get_unusual_options(ticker)
+        # 取得異常期權（僅美股有）
+    if market == 'us':
+        unusual_opt = get_unusual_options(ticker)
+    else:
+        unusual_opt = []
+    
     ai_signal = ensemble[1] if ensemble[1] else None
     tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
                                                unusual_opt[:2] if unusual_opt else None)
+    
+    # 分析異常期權的 Delta 值（僅美股）
+    if market == 'us' and unusual_opt:
+        delta_analysis = analyze_unusual_options(ticker, unusual_opt)
+    else:
+        delta_analysis = []
 
     # 取得三大法人資料（用於顯示）
     foreign, trust, dealer, inst_date = get_institutional_data(ticker)
