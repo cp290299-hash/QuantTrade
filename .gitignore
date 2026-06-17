@@ -8,3 +8,4 @@ scalers/
 __pycache__/
 .env"models/" 
 "scalers/" 
+.env

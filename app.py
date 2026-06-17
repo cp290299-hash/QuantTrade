@@ -2682,7 +2682,7 @@ if __name__ == "__main__":
     # ========== 手動測試結束 ==========
              
     # 啟動 WebSocket 即時訂閱（獨立執行緒）
-    threading.Thread(target=start_websocket_stream, daemon=True).start()
+    # threading.Thread(target=start_websocket_stream, daemon=True).start()   # 暫時禁用
 
     scheduler.start()
     
