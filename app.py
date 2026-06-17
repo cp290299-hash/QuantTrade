@@ -2248,6 +2248,12 @@ def positions_page():
     for p in pos:
         ticker = p['ticker']
         market = 'tw' if '.TW' in ticker else 'us'
+        def indicators_page(ticker):
+    import urllib.parse
+    ticker = urllib.parse.unquote(ticker).upper()
+    market = 'tw' if '.TW' in ticker else 'us'
+    unusual_opt = []   # 初始化，防止未定義錯誤
+    # ... 其餘程式碼 ...
         if market=='tw': curr,_,_,_ = get_tw_stock_data(ticker)
         else: curr,_,_,_ = get_us_stock_data(ticker)
         if curr==0: curr = p['cost']
@@ -2438,19 +2444,15 @@ def indicators_page(ticker):
     delta_analysis = analyze_unusual_options(ticker, unusual_opt)
 
   
-            # 取得異常期權（僅美股有）
+                # 取得異常期權（僅美股有）
     if market == 'us':
-        
-
-
-
-       unusual_opt = get_unusual_options(ticker)
+        try:
+            unusual_opt = get_unusual_options(ticker)
+        except Exception as e:
+            logger.error(f"取得異常期權失敗: {e}")
+            unusual_opt = []
     else:
-        
-
-
-
-       unusual_opt = []   # 台股或沒有期權的股票，設為空列表
+        unusual_opt = []
     
     ai_signal = ensemble[1] if ensemble[1] else None
     tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
@@ -2458,9 +2460,11 @@ def indicators_page(ticker):
     
     # 分析異常期權的 Delta 值（僅美股）
     if market == 'us' and unusual_opt:
-        delta_analysis = analyze_unusual_options(ticker, unusual_opt)
-    else:
-        delta_analysis = []   # 台股或沒有異常期權時，設為空列表
+        try:
+            delta_analysis = analyze_unusual_options(ticker, unusual_opt)
+        except Exception as e:
+            logger.error(f"Delta 分析失敗: {e}")
+            delta_analysis = []
     else:
         delta_analysis = []
 
