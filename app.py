@@ -16,7 +16,6 @@ from flask import Flask, render_template_string, render_template, request, redir
 from dotenv import load_dotenv
 load_dotenv()
 
-import ccxt
 import yfinance as yf
 from apscheduler.schedulers.background import BackgroundScheduler
 from sklearn.ensemble import RandomForestRegressor
@@ -864,28 +863,7 @@ def get_all_tickers(market):
                 tickers.append(t)
     return tickers
 def compute_stock_summary(ticker, market):
-    # 特殊處理加密貨幣 SPCX-USDC
-    if ticker == "SPCX-USDC":
-        price = get_crypto_price_ccxt("SPCX-USDC")
-        if price is None:
-            return None
-        return {
-            'ticker': ticker,
-            'price': round(price, 2),
-            'change': 0,
-            'pct': 0,
-            'ai_score': 50,
-            'trend': 'N/A',
-            'signal': '觀望',
-            'market': market,
-            'rsi': 50,
-            'macd_status': '-',
-            'vwap_status': 'N/A',
-            'volume_ratio': 1.0,
-            'ma20': price,
-            'ma60': price,
-            'ma200': price
-        }
+  
     # 原本的程式碼繼續...
     try:
         if market=='tw': curr, change, pct, df = get_tw_stock_data(ticker)
@@ -2607,7 +2585,6 @@ def institutional_view():
     '''
     return html
 
-import ccxt
 
 def get_crypto_price_ccxt(symbol, exchange='binance'):
     try:
@@ -2618,13 +2595,7 @@ def get_crypto_price_ccxt(symbol, exchange='binance'):
         print(f"ccxt error: {e}")
         return None
 
-@app.route('/crypto_price/<symbol>')
-def crypto_price(symbol):
-    price = get_crypto_price_ccxt(symbol)
-    if price:
-        return jsonify({'symbol': symbol.upper(), 'price': price})
-    else:
-        return jsonify({'error': f'無法獲取 {symbol} 價格'}), 500
+
 
 # ================== Shioaji WebSocket 即時報價 ==================
 import shioaji as sj
