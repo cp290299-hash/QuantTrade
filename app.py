@@ -2473,7 +2473,7 @@ def indicators_page(ticker):
                            ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
                            ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
                            gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                           unusual_options=unusual_opt, delta_analysis=delta_analysis)institutional_data=inst_display, institutional_score=inst_score)
+                           unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score)
 @app.route('/bonding')
 def bonding_page():
     threshold = settings.get('bonding_threshold',3.0)/100
