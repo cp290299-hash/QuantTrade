@@ -2248,11 +2248,11 @@ def positions_page():
     for p in pos:
         ticker = p['ticker']
         market = 'tw' if '.TW' in ticker else 'us'
-        def indicators_page(ticker):
+    def indicators_page(ticker):
     import urllib.parse
     ticker = urllib.parse.unquote(ticker).upper()
     market = 'tw' if '.TW' in ticker else 'us'
-    unusual_opt = []   # 初始化，防止未定義錯誤
+    unusual_opt = []   # 強制初始化
     # ... 其餘程式碼 ...
         if market=='tw': curr,_,_,_ = get_tw_stock_data(ticker)
         else: curr,_,_,_ = get_us_stock_data(ticker)
