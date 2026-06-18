@@ -2277,11 +2277,11 @@ def indicators_page(ticker):
     import urllib.parse
     ticker = urllib.parse.unquote(ticker).upper()
     market = 'tw' if '.TW' in ticker else 'us'
-    unusual_opt = []   # 強制初始化
-    # ... 其餘程式碼 ...
-        if market=='tw': curr,_,_,_ = get_tw_stock_data(ticker)
-        else: curr,_,_,_ = get_us_stock_data(ticker)
-        if curr==0: curr = p['cost']
+    unusual_opt = []
+    if market == 'tw':
+        curr, change, pct, df = get_tw_stock_data(ticker)
+    else:
+        curr, change, pct, df = get_us_stock_data(ticker)
         value = curr * p['shares']; cost_val = p['cost'] * p['shares']
         profit = value - cost_val; profit_pct = profit/cost_val*100 if cost_val else 0
         stop = p['cost'] * (1 - settings.get('max_loss_per_trade',5)/100)
