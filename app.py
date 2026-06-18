@@ -2012,7 +2012,7 @@ def retrain_all_models():
             if XGB_AVAILABLE: train_xgboost_model(t, force_retrain=True)
             
             
- train_lightgbm_model(t, force_retrain=True)
+            train_lightgbm_model(t, force_retrain=True)
             results.append(f"{t}: ✅ 成功")
         except Exception as e: results.append(f"{t}: ❌ {str(e)}")
     with _model_lock_rf: _model_cache_rf.clear()
