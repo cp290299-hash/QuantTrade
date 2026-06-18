@@ -2010,7 +2010,9 @@ def retrain_all_models():
         try:
             train_single_model_rf(t, force_retrain=True)
             if XGB_AVAILABLE: train_xgboost_model(t, force_retrain=True)
-            if LGB_AVAILABLE: train_lightgbm_model(t, force_retrain=True)
+            
+            
+ train_lightgbm_model(t, force_retrain=True)
             results.append(f"{t}: ✅ 成功")
         except Exception as e: results.append(f"{t}: ❌ {str(e)}")
     with _model_lock_rf: _model_cache_rf.clear()
@@ -2343,7 +2345,7 @@ def indicators_page(ticker):
                     X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
                     X_scaled = xgb_scaler.transform(X_pred)
                     xgb_pred_val = xgb_model.predict(X_scaled)[0] * 100
-             if LGB_AVAILABLE:
+                    if LGB_AVAILABLE:
             lgb_model, lgb_scaler = get_lgb_model(ticker)
             if lgb_model and lgb_scaler:
                 feats = calculate_features(df)
