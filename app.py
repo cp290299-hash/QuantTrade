@@ -2483,7 +2483,7 @@ def indicators_page(ticker):
     tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
                                                unusual_opt[:2] if unusual_opt else None)
     
-        # 暫時停用 Delta 分析以節省記憶體
+           # 分析異常期權的 Delta 值（暫時停用以節省記憶體）
     delta_analysis = []
     # if market == 'us' and unusual_opt:
     #     try:
@@ -2491,6 +2491,8 @@ def indicators_page(ticker):
     #     except Exception as e:
     #         logger.error(f"Delta 分析失敗: {e}")
     #         delta_analysis = []
+    # else:
+    #     delta_analysis = []
 
     # 取得三大法人資料（用於顯示）
     foreign, trust, dealer, inst_date = get_institutional_data(ticker)
