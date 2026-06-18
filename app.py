@@ -2273,7 +2273,7 @@ def positions_page():
     for p in pos:
         ticker = p['ticker']
         market = 'tw' if '.TW' in ticker else 'us'
-    def indicators_page(ticker):
+def indicators_page(ticker):
     import urllib.parse
     ticker = urllib.parse.unquote(ticker).upper()
     market = 'tw' if '.TW' in ticker else 'us'
