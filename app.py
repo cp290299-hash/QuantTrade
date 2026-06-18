@@ -2343,7 +2343,7 @@ def indicators_page(ticker):
                     X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
                     X_scaled = xgb_scaler.transform(X_pred)
                     xgb_pred_val = xgb_model.predict(X_scaled)[0] * 100
-        if LGB_AVAILABLE:
+                if LGB_AVAILABLE:
             lgb_model, lgb_scaler = get_lgb_model(ticker)
             if lgb_model and lgb_scaler:
                 feats = calculate_features(df)
@@ -2353,35 +2353,6 @@ def indicators_page(ticker):
                     lgb_pred_val = lgb_model.predict(X_scaled)[0] * 100
 
         ensemble = ensemble_predict(ticker, df)
-        options = None
-        if market == 'us':
-        options = get_options_signals(ticker)
-        # 新增：計算 PCR 和 Call/Put Wall
-        pcr = calculate_pcr(ticker)
-        call_wall, put_wall = calculate_call_put_wall(ticker)
-    else:
-        options = None
-        pcr = None
-        call_wall = put_wall = None
-        research_links = get_research_links(ticker)
-        reasons = []
-        if rsi < 30:
-            reasons.append("RSI超賣區")
-        elif rsi > 70:
-            reasons.append("RSI超買區")
-        else:
-            reasons.append("RSI中性")
-        if "金叉" in macd_status:
-            reasons.append("MACD黃金交叉")
-        elif "死叉" in macd_status:
-            reasons.append("MACD死亡交叉")
-        else:
-            reasons.append("MACD平穩")
-        if "站上" in vwap_status:
-            reasons.append("站上VWAP")
-        else:
-            reasons.append("跌破VWAP")
-                ensemble = ensemble_predict(ticker, df)
         
         # ----- 計算期權指標（僅美股） -----
         options = None
