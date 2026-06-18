@@ -2004,21 +2004,25 @@ def delete_us(ticker):
     return redirect(url_for('us_page'))
 @app.route("/retrain_all")
 def retrain_all_models():
-    tickers = get_all_tickers('tw')+get_all_tickers('us')
+    tickers = get_all_tickers('tw') + get_all_tickers('us')
     results = []
     for t in tickers:
         try:
             train_single_model_rf(t, force_retrain=True)
-            if XGB_AVAILABLE: train_xgboost_model(t, force_retrain=True)
-            
-            
-            train_lightgbm_model(t, force_retrain=True)
+            if XGB_AVAILABLE:
+                train_xgboost_model(t, force_retrain=True)
+            if LGB_AVAILABLE:
+                train_lightgbm_model(t, force_retrain=True)
             results.append(f"{t}: ✅ 成功")
-        except Exception as e: results.append(f"{t}: ❌ {str(e)}")
-    with _model_lock_rf: _model_cache_rf.clear()
-    with _model_lock_xgb: _model_cache_xgb.clear()
-    with _model_lock_lgb: _model_cache_lgb.clear()
-    return "<html><body><h1>重新訓練完成</h1><pre>"+"\n".join(results)+"</pre><a href='/'>返回</a></body></html>"
+        except Exception as e:
+            results.append(f"{t}: ❌ {str(e)}")
+    with _model_lock_rf:
+        _model_cache_rf.clear()
+    with _model_lock_xgb:
+        _model_cache_xgb.clear()
+    with _model_lock_lgb:
+        _model_cache_lgb.clear()
+    return "<html><body><h1>重新訓練完成</h1><pre>" + "\n".join(results) + "</pre><a href='/'>返回</a></body></html>"
 @app.route("/clear_model_cache")
 def clear_model_cache(): clear_cache(); return "✅ 所有快取已清除"
 @app.route("/force_update")
