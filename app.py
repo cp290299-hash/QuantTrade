@@ -6,10 +6,8 @@
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import os, sys, json, math, time, logging, random, re, threading
-import sys
 import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-import os, sys, json, math, time, logging, random, re, threading
 from datetime import datetime, timedelta
 from collections import defaultdict
 from flask import Flask, render_template_string, render_template, request, redirect, url_for, jsonify, Response, stream_with_context
@@ -54,6 +52,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
 @app.template_filter('format_number')
 def format_number(value):
     """將數字格式化為帶有逗號的字串"""
@@ -63,6 +62,7 @@ def format_number(value):
         return f"{value:,}"
     except (ValueError, TypeError):
         return value
+
 app.config['SECRET_KEY'] = 'quant-ai-dashboard'
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -91,6 +91,7 @@ def get_db_connection():
         return psycopg2.connect(DATABASE_URL)
     else:
         return sqlite3.connect(INSTITUTIONAL_DB)
+
 DEFAULT_SETTINGS = {
     "refresh_seconds": 60, "bonding_threshold": 3.0, "enable_ensemble": True,
     "prediction_days": 3, "train_days": 180, "retrain_hours": 24,
@@ -216,7 +217,7 @@ def get_tw_stock_realtime_shioaji(ticker, max_retries=3):
             contract = sj_api.Contracts.Stocks[stock_id]
             snapshot = sj_api.snapshot([contract])
             if not snapshot:
-                time.sleep(0.1 * (attempt + 1))  # 每次重試間隔遞增
+                time.sleep(0.1 * (attempt + 1))
                 continue
 
             tick = snapshot[0]
@@ -241,6 +242,7 @@ def get_tw_stock_realtime_shioaji(ticker, max_retries=3):
 
     logger.error(f"Shioaji 抓取 {ticker} 最終失敗，已重試 {max_retries} 次")
     return None, None, None
+
 # ================== 技術指標函數 ==================
 def calculate_rsi(close, period=14):
     if len(close) < period: return 50
@@ -363,6 +365,7 @@ def calculate_features(df):
     return features
 def get_feature_vector(features):
     return [features.get(name, 0) for name in FEATURE_NAMES]
+
 # ------------------ RandomForest ------------------
 def train_single_model_rf(ticker, force_retrain=False):
     model_name = ticker.replace('.TW','')
@@ -548,6 +551,7 @@ def get_ten_bagger_score(ticker):
         if any(x in ticker for x in ["NVDA","AMD","AVGO","MRVL","VRT","SMCI","PLTR","OKLO","IONQ"]): score+=30
     except: pass
     return min(100, score)
+
 def ensemble_predict(ticker, df):
     import math
     feats = calculate_features(df)
@@ -643,9 +647,9 @@ def ensemble_predict(ticker, df):
     else:
         signal = "賣出/避開"
 
-    # 回傳值保持與原函數一致
     ten_bagger = get_ten_bagger_score(ticker)
     return final, signal, details, 0.5, smart, hype, trend, growth, ten_bagger, [], final
+
 # ================== 期權信號計算 ==================
 def get_options_chain(ticker):
     try:
@@ -819,6 +823,7 @@ def get_options_signals(ticker):
     elif score <= -0.5: composite, color = "📉 期權信號偏空", "#ff8844"
     else: composite, color = "⛅ 期權信號中性", "#cccccc"
     return {"pcr":pcr,"max_pain":mp,"iv":iv,"gex":gex, "composite":{"score":round(score,2),"text":composite,"color":color,"reasons":reasons}}
+
 # ================== 資料處理函數 ==================
 def safe_get_close(df):
     if df is None or df.empty: return pd.Series(dtype=float)
@@ -866,8 +871,6 @@ def get_all_tickers(market):
                 tickers.append(t)
     return tickers
 def compute_stock_summary(ticker, market):
-  
-    # 原本的程式碼繼續...
     try:
         if market=='tw': curr, change, pct, df = get_tw_stock_data(ticker)
         else: curr, change, pct, df = get_us_stock_data(ticker)
@@ -1264,7 +1267,6 @@ def get_buffett_indicator():
         return round(ratio, 1), f"{ratio:.1f}% (參考值)", "https://www.macromicro.me/charts/406/us-buffet-index-gspc"
     except:
         return None, "參考 MacroMicro 數據", "https://www.macromicro.me/charts/406/us-buffet-index-gspc"
-
 def get_yield_curve_inversion():
     try:
         tnx = yf.Ticker("^TNX"); fvx = yf.Ticker("^FVX")
@@ -1282,7 +1284,6 @@ def get_yield_curve_inversion():
         return round(spread, 2), inversion, text
     except Exception:
         return None, None, "無法取得殖利率資料"
-
 def get_cnn_fear_greed():
     try:
         import fear_greed
@@ -1294,7 +1295,6 @@ def get_cnn_fear_greed():
     except Exception as e:
         logger.warning(f"恐懼貪婪指數獲取失敗: {e}")
         return 50, "中性", "https://edition.cnn.com/markets/fear-and-greed"
-
 def get_margin_data():
     url = "https://www.wantgoo.com/stock/margin-trading/utilization-rate-rank"
     balance = "約 3,200 億"
@@ -1312,13 +1312,128 @@ def clean_nan(value, default='N/A'):
     if isinstance(value, list):
         return [clean_nan(v, default) for v in value]
     return value
+
 # ================== 三大法人與主力籌碼數據整合 ==================
 def extract_stock_number(ticker):
-    """從 '2330.TW' 提取 '2330'"""
     return ticker.replace('.TW', '')
 
+def init_institutional_db():
+    """初始化三大法人資料庫，支援 SQLite 和 PostgreSQL"""
+    with closing(get_db_connection()) as conn:
+        cur = conn.cursor()
+        if DATABASE_URL:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS institutional_ownership (
+                    id SERIAL PRIMARY KEY,
+                    stock_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    foreign_investors INTEGER,
+                    investment_trust INTEGER,
+                    dealers INTEGER,
+                    UNIQUE(stock_id, date)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS large_shareholders (
+                    id SERIAL PRIMARY KEY,
+                    stock_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    holding_ratio REAL,
+                    shareholders_count INTEGER,
+                    UNIQUE(stock_id, date)
+                )
+            """)
+        else:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS institutional_ownership (
+                    stock_id TEXT,
+                    date TEXT,
+                    foreign_investors INTEGER,
+                    investment_trust INTEGER,
+                    dealers INTEGER,
+                    PRIMARY KEY (stock_id, date)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS large_shareholders (
+                    stock_id TEXT,
+                    date TEXT,
+                    holding_ratio REAL,
+                    shareholders_count INTEGER,
+                    PRIMARY KEY (stock_id, date)
+                )
+            """)
+        conn.commit()
+    logger.info("三大法人資料庫初始化完成")
+
+def fetch_institutional_holders(ticker, date=None):
+    import requests
+    from datetime import datetime, timedelta
+    stock_id = extract_stock_number(ticker)
+    if date is None:
+        date = datetime.now().strftime('%Y%m%d')
+    else:
+        date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
+    for i in range(5):
+        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
+        url = f"https://www.twse.com.tw/fund/T86?response=json&date={check_date}&selectType=ALLBUT0999"
+        try:
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('stat') == 'OK' and 'data' in data:
+                    for row in data['data']:
+                        if len(row) >= 6 and row[0].strip() == stock_id:
+                            foreign = int(row[3].replace(',', '')) if row[3] else 0
+                            trust = int(row[4].replace(',', '')) if row[4] else 0
+                            dealer = int(row[5].replace(',', '')) if row[5] else 0
+                            logger.info(f"成功抓取 {ticker} 在 {check_date} 的三大法人資料")
+                            return foreign, trust, dealer, check_date
+                    continue
+                else:
+                    continue
+        except Exception as e:
+            logger.error(f"抓取 {ticker} 在 {check_date} 失敗: {e}")
+            continue
+    logger.warning(f"{ticker} 連續5天都找不到三大法人資料")
+    return None, None, None, None
+
+def fetch_large_shareholders(ticker):
+    import requests
+    from requests.packages.urllib3.exceptions import InsecureRequestWarning
+    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    stock_id = extract_stock_number(ticker)
+    url = f"https://opendata.tdcc.com.tw/api/opendata/{stock_id}"
+    try:
+        resp = requests.get(url, timeout=10, verify=False, allow_redirects=False)
+        if resp.status_code in (301, 302):
+            new_url = resp.headers.get('Location')
+            if new_url:
+                resp = requests.get(new_url, timeout=10, verify=False)
+        if resp.status_code == 200:
+            data = resp.json()
+            if data and 'data' in data and data['data']:
+                total_shares = None
+                large_shares = 0
+                for item in data['data']:
+                    range_str = item.get('持股分級', '')
+                    shares_str = item.get('股數', '0')
+                    try:
+                        shares = int(shares_str.replace(',', ''))
+                    except:
+                        shares = 0
+                    if range_str == "合計":
+                        total_shares = shares
+                    elif any(level in range_str for level in ["1,000", "5,000", "10,000", "50,000", "100,000"]):
+                        large_shares += shares
+                if total_shares and total_shares > 0:
+                    ratio = large_shares / total_shares * 100
+                    return ratio
+    except Exception as e:
+        logger.error(f"抓取 {ticker} 千張大戶資料失敗: {e}")
+    return None
+
 def update_institutional_data(ticker):
-    """更新單一股票的三大法人資料到資料庫"""
     foreign, trust, dealer, data_date = fetch_institutional_holders(ticker)
     if foreign is None:
         logger.warning(f"{ticker} 無三大法人資料，跳過更新")
@@ -1326,7 +1441,6 @@ def update_institutional_data(ticker):
     with closing(get_db_connection()) as conn:
         cur = conn.cursor()
         if DATABASE_URL:
-            # PostgreSQL 語法：使用 ON CONFLICT 處理重複
             cur.execute('''
                 INSERT INTO institutional_ownership (stock_id, date, foreign_investors, investment_trust, dealers)
                 VALUES (%s, %s, %s, %s, %s)
@@ -1336,15 +1450,14 @@ def update_institutional_data(ticker):
                     dealers = EXCLUDED.dealers
             ''', (ticker, data_date, foreign, trust, dealer))
         else:
-            # SQLite 語法
             cur.execute('''
                 INSERT OR REPLACE INTO institutional_ownership (stock_id, date, foreign_investors, investment_trust, dealers)
                 VALUES (?, ?, ?, ?, ?)
             ''', (ticker, data_date, foreign, trust, dealer))
         conn.commit()
     logger.info(f"更新 {ticker} ({data_date}) 三大法人: 外資={foreign}, 投信={trust}, 自營={dealer}")
+
 def update_large_shareholders_data(ticker):
-    """更新千張大戶持股比率到資料庫"""
     ratio = fetch_large_shareholders(ticker)
     if ratio is None:
         logger.warning(f"{ticker} 無千張大戶資料，跳過更新")
@@ -1367,24 +1480,74 @@ def update_large_shareholders_data(ticker):
             ''', (ticker, today, ratio, 0))
         conn.commit()
     logger.info(f"更新 {ticker} 千張大戶持股比率: {ratio:.2f}%")
-    # 每日更新三大法人資料（週一至週五 16:30）
-    scheduler.add_job(
-        func=lambda: [update_institutional_data(t) for t in get_all_tickers('tw')],
-        trigger="cron",
-        day_of_week='mon-fri',
-        hour=16,
-        minute=30,
-        max_instances=1
-    )
-    # 每週六更新千張大戶持股（週五資料）
-    scheduler.add_job(
-        func=lambda: [update_large_shareholders_data(t) for t in get_all_tickers('tw')],
-        trigger="cron",
-        day_of_week='sat',
-        hour=8,
-        minute=0,
-        max_instances=1
-    )
+
+def get_institutional_data(ticker, date=None):
+    with closing(get_db_connection()) as conn:
+        cur = conn.cursor()
+        if DATABASE_URL:
+            if date is None:
+                cur.execute('''
+                    SELECT foreign_investors, investment_trust, dealers, date
+                    FROM institutional_ownership
+                    WHERE stock_id = %s
+                    ORDER BY date DESC LIMIT 1
+                ''', (ticker,))
+            else:
+                cur.execute('''
+                    SELECT foreign_investors, investment_trust, dealers, date
+                    FROM institutional_ownership
+                    WHERE stock_id = %s AND date = %s
+                ''', (ticker, date))
+        else:
+            if date is None:
+                cur.execute('''
+                    SELECT foreign_investors, investment_trust, dealers, date
+                    FROM institutional_ownership
+                    WHERE stock_id = ?
+                    ORDER BY date DESC LIMIT 1
+                ''', (ticker,))
+            else:
+                cur.execute('''
+                    SELECT foreign_investors, investment_trust, dealers, date
+                    FROM institutional_ownership
+                    WHERE stock_id = ? AND date = ?
+                ''', (ticker, date))
+        row = cur.fetchone()
+        if row:
+            return row[0], row[1], row[2], row[3]
+    return None, None, None, None
+
+def calculate_institutional_score(foreign, trust, dealer):
+    score = 50
+    if foreign is not None:
+        foreign_abs = abs(foreign)
+        if foreign > 0:
+            foreign_score = min(16.67, foreign_abs / 1_000_000)
+        elif foreign < 0:
+            foreign_score = -min(16.67, foreign_abs / 1_000_000)
+        else:
+            foreign_score = 0
+        score += foreign_score
+    if trust is not None:
+        trust_abs = abs(trust)
+        if trust > 0:
+            trust_score = min(16.67, trust_abs / 1_000_000)
+        elif trust < 0:
+            trust_score = -min(16.67, trust_abs / 1_000_000)
+        else:
+            trust_score = 0
+        score += trust_score
+    if dealer is not None:
+        dealer_abs = abs(dealer)
+        if dealer > 0:
+            dealer_score = min(16.67, dealer_abs / 1_000_000)
+        elif dealer < 0:
+            dealer_score = -min(16.67, dealer_abs / 1_000_000)
+        else:
+            dealer_score = 0
+        score += dealer_score
+    return max(0, min(100, score))
+
 # ================== 持倉函數 ==================
 def load_positions():
     if os.path.exists(POSITIONS_FILE):
@@ -1393,6 +1556,7 @@ def load_positions():
 def save_positions(positions):
     with open(POSITIONS_FILE, 'w', encoding='utf-8') as f:
         json.dump(positions, f, indent=2, ensure_ascii=False)
+
 def add_multiple_stocks(tickers_str, market):
     tickers = re.split(r'[,\s\n]+', tickers_str.strip().upper())
     tickers = [t for t in tickers if t]
@@ -1485,6 +1649,7 @@ def get_earnings_info(ticker):
             data = json.load(f)
         return data.get(ticker, {})
     except: return {}
+
 # ================== 強化戰術建議函數 ==================
 def generate_tactical_advice(current_price, call_wall, put_wall, gamma_flip, ma_trend, vwap_status, ai_signal=None, unusual_options=None):
     advice = []
@@ -1519,56 +1684,39 @@ def generate_tactical_advice(current_price, call_wall, put_wall, gamma_flip, ma_
         advice.append(f"📢 異常期權: {unusual_options}")
     if not advice: return "⚖️ 區間震盪"
     return " | ".join(advice)
+
 def calculate_option_delta(ticker, expiration_date, strike, option_type='call'):
-    """
-    計算特定期權的 Delta 值
-    - ticker: 股票代號（如 AAPL）
-    - expiration_date: 到期日（YYYY-MM-DD）
-    - strike: 履約價
-    - option_type: 'call' 或 'put'
-    """
     try:
         import yfinance as yf
         from datetime import datetime
         import numpy as np
         from scipy.stats import norm
-
         stock = yf.Ticker(ticker)
         hist = stock.history(period="1d")
         if hist.empty:
             return None
         current_price = hist['Close'].iloc[-1]
-
-        # 計算到期天數（年化）
         expiry = datetime.strptime(expiration_date, '%Y-%m-%d')
         T = (expiry - datetime.now()).days / 365
         if T <= 0:
             return None
-
-        # 獲取歷史波動率（使用 60 天年化波動率）
         hist_data = stock.history(period="60d")
         if len(hist_data) < 2:
-            sigma = 0.3  # 預設值
+            sigma = 0.3
         else:
             sigma = hist_data['Close'].pct_change().dropna().std() * np.sqrt(252)
-
-        # 無風險利率（此處使用 4.2% 近似）
         r = 0.042
-
-        # 計算 Delta
         d1 = (np.log(current_price / strike) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
         if option_type.lower() == 'call':
             delta_val = norm.cdf(d1)
-        else:  # put
+        else:
             delta_val = norm.cdf(d1) - 1
-
         return round(delta_val, 4)
     except Exception as e:
         print(f"計算 Delta 失敗: {e}")
         return None
 
 def analyze_unusual_options(ticker, unusual_options):
-    """分析異常期權，輸出 Delta、價內/價外狀態與綜合判斷"""
     if not unusual_options:
         return []
     import re
@@ -1585,7 +1733,6 @@ def analyze_unusual_options(ticker, unusual_options):
             return [{"summary": f"無法獲取期權到期日: {e}"}]
         if not exps:
             return [{"summary": "該股票目前無期權數據"}]
-
         analysis = []
         for opt in unusual_options:
             match = re.search(r'Call \$([\d.]+)', opt)
@@ -1600,7 +1747,6 @@ def analyze_unusual_options(ticker, unusual_options):
                 delta_val = None
             if delta_val is None:
                 continue
-            # 修正：與 current_price 比較
             moneyness = "價內" if strike < current_price else "價外" if strike > current_price else "價平"
             if delta_val >= 0.7:
                 strength = "高敏感（深度價內）"
@@ -1619,23 +1765,6 @@ def analyze_unusual_options(ticker, unusual_options):
     except Exception as e:
         print(f"analyze_unusual_options 整體錯誤: {e}")
         return [{"summary": f"分析過程中發生錯誤: {str(e)}"}]
-        # 判斷價內/價外
-        moneyness = "價內" if strike < current_price else "價外" if strike > current_price else "價平"
-        # 判斷 Delta 強度
-        if delta_val >= 0.7:
-            strength = "高敏感（深度價內）"
-        elif delta_val >= 0.4:
-            strength = "中敏感（價平附近）"
-        else:
-            strength = "低敏感（深度價外）"
-        analysis.append({
-            'strike': strike,
-            'delta': delta_val,
-            'moneyness': moneyness,
-            'strength': strength,
-            'summary': f"Call ${strike:.1f} → Delta={delta_val:.2f} ({moneyness}，{strength})"
-        })
-    return analysis
 
 def get_unusual_options(ticker):
     try:
@@ -1656,226 +1785,7 @@ def get_unusual_options(ticker):
                 unusual.append(f"Put ${row['strike']} 爆量 (Vol/OI={vol/oi:.1f})")
         return unusual[:3]
     except: return []
-# ================== 三大法人與主力籌碼數據整合 ==================
-def init_institutional_db():
-    """初始化三大法人資料庫，支援 SQLite 和 PostgreSQL"""
-    with closing(get_db_connection()) as conn:
-        cur = conn.cursor()
-        if DATABASE_URL:
-            # PostgreSQL 語法
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS institutional_ownership (
-                    id SERIAL PRIMARY KEY,
-                    stock_id TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    foreign_investors INTEGER,
-                    investment_trust INTEGER,
-                    dealers INTEGER,
-                    UNIQUE(stock_id, date)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS large_shareholders (
-                    id SERIAL PRIMARY KEY,
-                    stock_id TEXT NOT NULL,
-                    date TEXT NOT NULL,
-                    holding_ratio REAL,
-                    shareholders_count INTEGER,
-                    UNIQUE(stock_id, date)
-                )
-            """)
-        else:
-            # SQLite 語法
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS institutional_ownership (
-                    stock_id TEXT,
-                    date TEXT,
-                    foreign_investors INTEGER,
-                    investment_trust INTEGER,
-                    dealers INTEGER,
-                    PRIMARY KEY (stock_id, date)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS large_shareholders (
-                    stock_id TEXT,
-                    date TEXT,
-                    holding_ratio REAL,
-                    shareholders_count INTEGER,
-                    PRIMARY KEY (stock_id, date)
-                )
-            """)
-        conn.commit()
-    logger.info("三大法人資料庫初始化完成")
 
-# 啟動時初始化（如果尚未執行，可在此呼叫）
-# init_institutional_db()  # 我們稍後會在程式啟動時呼叫一次，此處先註解
-
-def extract_stock_number(ticker):
-    """從 '2330.TW' 提取 '2330'"""
-    return ticker.replace('.TW', '')
-
-def fetch_institutional_holders(ticker, date=None):
-    import requests
-    from datetime import datetime, timedelta
-
-    stock_id = extract_stock_number(ticker)
-    if date is None:
-        date = datetime.now().strftime('%Y%m%d')
-    else:
-        date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
-
-    for i in range(5):
-        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
-        # 使用 T86 全體資料端點，再過濾代號
-        url = f"https://www.twse.com.tw/fund/T86?response=json&date={check_date}&selectType=ALLBUT0999"
-        try:
-            resp = requests.get(url, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get('stat') == 'OK' and 'data' in data:
-                    for row in data['data']:
-                        if len(row) >= 6 and row[0].strip() == stock_id:
-                            foreign = int(row[3].replace(',', '')) if row[3] else 0
-                            trust = int(row[4].replace(',', '')) if row[4] else 0
-                            dealer = int(row[5].replace(',', '')) if row[5] else 0
-                            logger.info(f"成功抓取 {ticker} 在 {check_date} 的三大法人資料")
-                            return foreign, trust, dealer, check_date
-                    continue  # 沒有找到該股票代號
-                else:
-                    continue
-        except Exception as e:
-            logger.error(f"抓取 {ticker} 在 {check_date} 失敗: {e}")
-            continue
-
-    logger.warning(f"{ticker} 連續5天都找不到三大法人資料")
-    return None, None, None, None
-
-def fetch_large_shareholders(ticker):
-    """從集保結算所抓取千張大戶持股比率（使用新版 API）"""
-    import requests
-    import ssl
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-
-    stock_id = extract_stock_number(ticker)
-    # 新版 API 網址（集保中心開放資料）
-    url = f"https://opendata.tdcc.com.tw/api/opendata/{stock_id}"
-    # 若上面仍然 redirect，可以試試用 requests 的 allow_redirects=False 並處理 Location
-    try:
-        # 禁用自動重定向，手動跟進（但最多一次）
-        resp = requests.get(url, timeout=10, verify=False, allow_redirects=False)
-        if resp.status_code == 302 or resp.status_code == 301:
-            # 獲取重定向後的網址（可能是 https://tdcc.com.tw/...）
-            new_url = resp.headers.get('Location')
-            if new_url:
-                resp = requests.get(new_url, timeout=10, verify=False)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data and 'data' in data and data['data']:
-                total_shares = None
-                large_shares = 0
-                for item in data['data']:
-                    range_str = item.get('持股分級', '')
-                    shares_str = item.get('股數', '0')
-                    try:
-                        shares = int(shares_str.replace(',', ''))
-                    except:
-                        shares = 0
-                    if range_str == "合計":
-                        total_shares = shares
-                    elif any(level in range_str for level in ["1,000", "5,000", "10,000", "50,000", "100,000"]):
-                        large_shares += shares
-                if total_shares and total_shares > 0:
-                    ratio = large_shares / total_shares * 100
-                    return ratio
-    except Exception as e:
-        logger.error(f"抓取 {ticker} 千張大戶資料失敗: {e}")
-    return None
-def update_large_shareholders_data(ticker):
-    """更新千張大戶持股比率到資料庫"""
-    ratio = fetch_large_shareholders(ticker)
-    if ratio is None:
-        logger.warning(f"{ticker} 無千張大戶資料，跳過更新")
-        return
-    today = datetime.now().strftime('%Y%m%d')
-    with closing(sqlite3.connect(INSTITUTIONAL_DB)) as conn:
-        conn.execute('''
-            INSERT OR REPLACE INTO large_shareholders (stock_id, date, holding_ratio, shareholders_count)
-            VALUES (?, ?, ?, ?)
-        ''', (ticker, today, ratio, 0))
-        conn.commit()
-    logger.info(f"更新 {ticker} 千張大戶持股比率: {ratio:.2f}%")
-def get_institutional_data(ticker, date=None):
-    """取得最新三大法人買賣超，回傳 (外資, 投信, 自營商, 資料日期)"""
-    with closing(get_db_connection()) as conn:
-        cur = conn.cursor()
-        if DATABASE_URL:
-            # PostgreSQL 使用 %s 佔位符
-            if date is None:
-                cur.execute('''
-                    SELECT foreign_investors, investment_trust, dealers, date
-                    FROM institutional_ownership
-                    WHERE stock_id = %s
-                    ORDER BY date DESC LIMIT 1
-                ''', (ticker,))
-            else:
-                cur.execute('''
-                    SELECT foreign_investors, investment_trust, dealers, date
-                    FROM institutional_ownership
-                    WHERE stock_id = %s AND date = %s
-                ''', (ticker, date))
-        else:
-            # SQLite 使用 ? 佔位符
-            if date is None:
-                cur.execute('''
-                    SELECT foreign_investors, investment_trust, dealers, date
-                    FROM institutional_ownership
-                    WHERE stock_id = ?
-                    ORDER BY date DESC LIMIT 1
-                ''', (ticker,))
-            else:
-                cur.execute('''
-                    SELECT foreign_investors, investment_trust, dealers, date
-                    FROM institutional_ownership
-                    WHERE stock_id = ? AND date = ?
-                ''', (ticker, date))
-        row = cur.fetchone()
-        if row:
-            return row[0], row[1], row[2], row[3]
-    return None, None, None, None
-def calculate_institutional_score(foreign, trust, dealer):
-    """將三大法人買賣超轉換為 0-100 分，買超為正向貢獻"""
-    score = 50  # 基準分
-    # 外資、投信、自營商各貢獻 0~16.67 分，總和 50 分
-    if foreign is not None:
-        foreign_abs = abs(foreign)
-        if foreign > 0:
-            foreign_score = min(16.67, foreign_abs / 1_000_000)
-        elif foreign < 0:
-            foreign_score = -min(16.67, foreign_abs / 1_000_000)
-        else:
-            foreign_score = 0
-        score += foreign_score
-    if trust is not None:
-        trust_abs = abs(trust)
-        if trust > 0:
-            trust_score = min(16.67, trust_abs / 1_000_000)
-        elif trust < 0:
-            trust_score = -min(16.67, trust_abs / 1_000_000)
-        else:
-            trust_score = 0
-        score += trust_score
-    if dealer is not None:
-        dealer_abs = abs(dealer)
-        if dealer > 0:
-            dealer_score = min(16.67, dealer_abs / 1_000_000)
-        elif dealer < 0:
-            dealer_score = -min(16.67, dealer_abs / 1_000_000)
-        else:
-            dealer_score = 0
-        score += dealer_score
-    return max(0, min(100, score))
 # ================== 路由 ==================
 @app.route('/gex_plot/<ticker>')
 def gex_plot(ticker):
@@ -2006,7 +1916,7 @@ def gex_plot(ticker):
         return full_html
     except Exception as e:
         logger.exception(f"GEX 繪圖錯誤: {e}")
-        return f"<h3>錯誤: {e}</h3><a href='/indicators/{ticker}'>返回個股頁面</a>"   
+        return f"<h3>錯誤: {e}</h3><a href='/indicators/{ticker}'>返回個股頁面</a>"
 
 @app.route("/add_stock_tw", methods=["POST"])
 def add_stock_tw():
@@ -2038,25 +1948,18 @@ def add_position():
     except: return "❌ 輸入錯誤",400
 @app.route("/add_batch_us", methods=["POST"])
 def add_batch_us():
-    """批量新增美股（熱門清單）"""
-    # 預設熱門美股（可依需求修改）
     default_tickers = ["AAPL", "MSFT", "GOOGL", "NVDA", "TSLA", "META", "AMD", "INTC", "QCOM", "AMZN"]
-    # 從表單獲取（允許自訂，若無則使用預設）
     tickers_str = request.form.get("tickers", ",".join(default_tickers))
-    # 解析多種分隔符（逗號、空格、換行）
     tickers = [t.strip().upper() for t in tickers_str.replace('\n', ',').replace(' ', ',').split(',') if t.strip()]
     added, new = add_multiple_stocks(tickers, 'us')
     if added == 0:
         return "⚠️ 所有美股代號都已存在<br><a href='/us'>返回</a>"
     return f"✅ 成功新增 {added} 檔美股：{', '.join(new)}<br><a href='/us'>返回</a>"
-
 @app.route("/add_batch_tw", methods=["POST"])
 def add_batch_tw():
-    """批量新增台股（熱門權值股）"""
     default_tickers = ["2330", "2317", "2454", "2308", "2412", "2881", "2882", "2891", "1303", "1326"]
     tickers_str = request.form.get("tickers", ",".join(default_tickers))
     tickers = [t.strip().upper() for t in tickers_str.replace('\n', ',').replace(' ', ',').split(',') if t.strip()]
-    # 確保台股代號加上 .TW 後綴（add_multiple_stocks 會自動處理）
     added, new = add_multiple_stocks(tickers, 'tw')
     if added == 0:
         return "⚠️ 所有台股代號都已存在<br><a href='/tw'>返回</a>"
@@ -2177,7 +2080,7 @@ def simulator(ticker):
     current = calc_analysis(current_price) if current_price else {}
     simulated = calc_analysis(sim_price) if sim_price>0 else None
     return render_template('simulator.html', ticker=ticker, current=current, simulated=simulated,
-                                   current_price=current_price, call_wall=call_wall, put_wall=put_wall, gamma_flip=gamma_flip)
+                           current_price=current_price, call_wall=call_wall, put_wall=put_wall, gamma_flip=gamma_flip)
 
 @app.route('/')
 def index():
@@ -2195,13 +2098,13 @@ def index():
     fear_greed_score, fear_greed_level, fear_greed_url = get_cnn_fear_greed()
     margin_balance, margin_ratio, margin_url = get_margin_data()
     return render_template('index.html', tw_stocks=tw_stocks, us_stocks=us_stocks, alerts=alerts,
-                                  market_temp=market_temp, market_status=market_status,
-                                  us_sector_perf=us_sector, tw_sector_perf=tw_sector,
-                                  vix=vix, treasury=treasury, dollar=dollar, shioaji_status=shioaji_status,
-                                  buffett_val=buffett_val, buffett_desc=buffett_desc, buffett_url=buffett_url,
-                                  yield_spread=yield_spread, yield_inverted=yield_inverted, yield_text=yield_text,
-                                  fear_greed_score=fear_greed_score, fear_greed_level=fear_greed_level, fear_greed_url=fear_greed_url,
-                                  margin_balance=margin_balance, margin_ratio=margin_ratio, margin_url=margin_url)
+                           market_temp=market_temp, market_status=market_status,
+                           us_sector_perf=us_sector, tw_sector_perf=tw_sector,
+                           vix=vix, treasury=treasury, dollar=dollar, shioaji_status=shioaji_status,
+                           buffett_val=buffett_val, buffett_desc=buffett_desc, buffett_url=buffett_url,
+                           yield_spread=yield_spread, yield_inverted=yield_inverted, yield_text=yield_text,
+                           fear_greed_score=fear_greed_score, fear_greed_level=fear_greed_level, fear_greed_url=fear_greed_url,
+                           margin_balance=margin_balance, margin_ratio=margin_ratio, margin_url=margin_url)
 
 @app.route('/tw')
 def tw_page():
@@ -2216,12 +2119,12 @@ def tw_page():
     except: stocks = []
     stocks.sort(key=lambda x: x.get('ai_score',0), reverse=True)
     return render_template('tw_us.html', market='tw', stocks=stocks, title="台股監控 - 所有自選股",
-                                  tw_curr=tw_curr, tw_change=tw_change, tw_pct=tw_pct,
-                                  otc_curr=otc_curr, otc_change=otc_change, otc_pct=otc_pct,
-                                  dow_curr=dow_curr, dow_change=dow_change, dow_pct=dow_pct,
-                                  nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
-                                  sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
-                                  shioaji_status=get_shioaji_status())
+                           tw_curr=tw_curr, tw_change=tw_change, tw_pct=tw_pct,
+                           otc_curr=otc_curr, otc_change=otc_change, otc_pct=otc_pct,
+                           dow_curr=dow_curr, dow_change=dow_change, dow_pct=dow_pct,
+                           nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
+                           sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
+                           shioaji_status=get_shioaji_status())
 
 @app.route('/us')
 def us_page():
@@ -2236,12 +2139,12 @@ def us_page():
     except: stocks = []
     stocks.sort(key=lambda x: x.get('ai_score',0), reverse=True)
     return render_template('tw_us.html', market='us', stocks=stocks, title="美股監控 - 所有自選股",
-                                  tw_curr=tw_curr, tw_change=tw_change, tw_pct=tw_pct,
-                                  otc_curr=otc_curr, otc_change=otc_change, otc_pct=otc_pct,
-                                  dow_curr=dow_curr, dow_change=dow_change, dow_pct=dow_pct,
-                                  nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
-                                  sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
-                                  shioaji_status=get_shioaji_status())
+                           tw_curr=tw_curr, tw_change=tw_change, tw_pct=tw_pct,
+                           otc_curr=otc_curr, otc_change=otc_change, otc_pct=otc_pct,
+                           dow_curr=dow_curr, dow_change=dow_change, dow_pct=dow_pct,
+                           nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
+                           sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
+                           shioaji_status=get_shioaji_status())
 
 @app.route('/ai_ranking')
 def ai_ranking():
@@ -2273,15 +2176,9 @@ def positions_page():
     for p in pos:
         ticker = p['ticker']
         market = 'tw' if '.TW' in ticker else 'us'
-def indicators_page(ticker):
-    import urllib.parse
-    ticker = urllib.parse.unquote(ticker).upper()
-    market = 'tw' if '.TW' in ticker else 'us'
-    unusual_opt = []
-    if market == 'tw':
-        curr, change, pct, df = get_tw_stock_data(ticker)
-    else:
-        curr, change, pct, df = get_us_stock_data(ticker)
+        if market=='tw': curr,_,_,_ = get_tw_stock_data(ticker)
+        else: curr,_,_,_ = get_us_stock_data(ticker)
+        if curr==0: curr = p['cost']
         value = curr * p['shares']; cost_val = p['cost'] * p['shares']
         profit = value - cost_val; profit_pct = profit/cost_val*100 if cost_val else 0
         stop = p['cost'] * (1 - settings.get('max_loss_per_trade',5)/100)
@@ -2289,243 +2186,248 @@ def indicators_page(ticker):
                          'current_price':round(curr,2),'value':round(value,2),'cost_value':round(cost_val,2),
                          'profit':round(profit,2),'profit_pct':round(profit_pct,2),'stop_loss':round(stop,2)})
     return render_template('positions.html', positions=enriched)
+
 @app.route('/indicators/<ticker>')
 def indicators_page(ticker):
-    import urllib.parse
-    ticker = urllib.parse.unquote(ticker).upper()
-    market = 'tw' if '.TW' in ticker else 'us'
-    if market == 'tw':
-        curr, change, pct, df = get_tw_stock_data(ticker)
-    else:
-        curr, change, pct, df = get_us_stock_data(ticker)
-    if df.empty or curr == 0 or math.isnan(curr):
-        return render_template('indicators.html', ticker=ticker, error="無法取得有效股價資料")
+    try:
+        import urllib.parse
+        ticker = urllib.parse.unquote(ticker).upper()
+        market = 'tw' if '.TW' in ticker else 'us'
+        unusual_opt = []   # 強制初始化
+        
+        if market == 'tw':
+            curr, change, pct, df = get_tw_stock_data(ticker)
+        else:
+            curr, change, pct, df = get_us_stock_data(ticker)
+        if df.empty or curr == 0 or math.isnan(curr):
+            return render_template('indicators.html', ticker=ticker, error="無法取得有效股價資料")
 
-    close = df['Close'].dropna().values
-    if len(close) < 2:
-        return render_template('indicators.html', ticker=ticker, error="歷史收盤價不足 (少於2天)")
-
-    if len(close) >= 5:
-        ma5 = np.mean(close[-5:])
-        ma10 = np.mean(close[-10:]) if len(close) >= 10 else close[-1]
-        ma20 = np.mean(close[-20:]) if len(close) >= 20 else close[-1]
-        ma60 = np.mean(close[-60:]) if len(close) >= 60 else close[-1]
-        ma120 = np.mean(close[-120:]) if len(close) >= 120 else close[-1]
-        ma240 = np.mean(close[-240:]) if len(close) >= 240 else close[-1]
-    else:
-        ma5 = ma10 = ma20 = ma60 = ma120 = ma240 = curr
-
-    for var in ['ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma240']:
-        if np.isnan(locals()[var]):
-            locals()[var] = curr
-
-    close_series = safe_get_close(df)
-    if len(close_series) >= 15:
-        deltas = np.diff(close_series[-15:])
-        gain = np.mean(deltas[deltas > 0]) if any(deltas > 0) else 0
-        loss = -np.mean(deltas[deltas < 0]) if any(deltas < 0) else 0
-        rsi = 100 - 100 / (1 + (gain / loss if loss else 1))
-    else:
-        rsi = 50
-    if rsi < 30:
-        rsi_status = "🔴 超賣 (可能反彈)"
-    elif rsi < 50:
-        rsi_status = "🟡 弱勢"
-    elif rsi < 70:
-        rsi_status = "🟢 強勢"
-    else:
-        rsi_status = "⚠️ 超買 (注意回檔)"
-
-    if len(close_series) >= 35:
-        _, _, hist, macd_status = calculate_macd(close_series)
-    else:
-        macd_status, hist = "-", 0
-
-    vwap = calculate_vwap(df)
-    vwap_status = get_vwap_status(curr, vwap) if vwap else "N/A"
-
-    def get_ma_trend(ma_name):
+        close = df['Close'].dropna().values
         if len(close) < 2:
-            return "flat", 0
-        if ma_name == 'ma5':
-            yesterday = np.mean(close[-6:-1]) if len(close) >= 6 else ma5
-            diff = ma5 - yesterday
-        elif ma_name == 'ma10':
-            yesterday = np.mean(close[-11:-1]) if len(close) >= 11 else ma10
-            diff = ma10 - yesterday
-        elif ma_name == 'ma20':
-            yesterday = np.mean(close[-21:-1]) if len(close) >= 21 else ma20
-            diff = ma20 - yesterday
-        elif ma_name == 'ma60':
-            yesterday = np.mean(close[-61:-1]) if len(close) >= 61 else ma60
-            diff = ma60 - yesterday
-        elif ma_name == 'ma120':
-            yesterday = np.mean(close[-121:-1]) if len(close) >= 121 else ma120
-            diff = ma120 - yesterday
-        elif ma_name == 'ma240':
-            yesterday = np.mean(close[-241:-1]) if len(close) >= 241 else ma240
-            diff = ma240 - yesterday
+            return render_template('indicators.html', ticker=ticker, error="歷史收盤價不足 (少於2天)")
+
+        if len(close) >= 5:
+            ma5 = np.mean(close[-5:])
+            ma10 = np.mean(close[-10:]) if len(close) >= 10 else close[-1]
+            ma20 = np.mean(close[-20:]) if len(close) >= 20 else close[-1]
+            ma60 = np.mean(close[-60:]) if len(close) >= 60 else close[-1]
+            ma120 = np.mean(close[-120:]) if len(close) >= 120 else close[-1]
+            ma240 = np.mean(close[-240:]) if len(close) >= 240 else close[-1]
         else:
-            diff = 0
-        if diff > 0:
-            return "up", diff
-        elif diff < 0:
-            return "down", diff
+            ma5 = ma10 = ma20 = ma60 = ma120 = ma240 = curr
+
+        for var in ['ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma240']:
+            if np.isnan(locals()[var]):
+                locals()[var] = curr
+
+        close_series = safe_get_close(df)
+        if len(close_series) >= 15:
+            deltas = np.diff(close_series[-15:])
+            gain = np.mean(deltas[deltas > 0]) if any(deltas > 0) else 0
+            loss = -np.mean(deltas[deltas < 0]) if any(deltas < 0) else 0
+            rsi = 100 - 100 / (1 + (gain / loss if loss else 1))
         else:
-            return "flat", 0
+            rsi = 50
+        if rsi < 30:
+            rsi_status = "🔴 超賣 (可能反彈)"
+        elif rsi < 50:
+            rsi_status = "🟡 弱勢"
+        elif rsi < 70:
+            rsi_status = "🟢 強勢"
+        else:
+            rsi_status = "⚠️ 超買 (注意回檔)"
 
-    ma5_trend, _ = get_ma_trend('ma5')
-    ma10_trend, _ = get_ma_trend('ma10')
-    ma20_trend, _ = get_ma_trend('ma20')
-    ma60_trend, _ = get_ma_trend('ma60')
-    ma120_trend, _ = get_ma_trend('ma120')
-    ma240_trend, _ = get_ma_trend('ma240')
+        if len(close_series) >= 35:
+            _, _, hist, macd_status = calculate_macd(close_series)
+        else:
+            macd_status, hist = "-", 0
 
-    def price_to_ma_ratio(price, ma):
-        if ma == 0:
-            return 0
-        return (price / ma - 1) * 100
+        vwap = calculate_vwap(df)
+        vwap_status = get_vwap_status(curr, vwap) if vwap else "N/A"
 
-    ma5_ratio = price_to_ma_ratio(curr, ma5)
-    ma10_ratio = price_to_ma_ratio(curr, ma10)
-    ma20_ratio = price_to_ma_ratio(curr, ma20)
-    ma60_ratio = price_to_ma_ratio(curr, ma60)
-    ma120_ratio = price_to_ma_ratio(curr, ma120)
-    ma240_ratio = price_to_ma_ratio(curr, ma240)
+        def get_ma_trend(ma_name):
+            if len(close) < 2:
+                return "flat", 0
+            if ma_name == 'ma5':
+                yesterday = np.mean(close[-6:-1]) if len(close) >= 6 else ma5
+                diff = ma5 - yesterday
+            elif ma_name == 'ma10':
+                yesterday = np.mean(close[-11:-1]) if len(close) >= 11 else ma10
+                diff = ma10 - yesterday
+            elif ma_name == 'ma20':
+                yesterday = np.mean(close[-21:-1]) if len(close) >= 21 else ma20
+                diff = ma20 - yesterday
+            elif ma_name == 'ma60':
+                yesterday = np.mean(close[-61:-1]) if len(close) >= 61 else ma60
+                diff = ma60 - yesterday
+            elif ma_name == 'ma120':
+                yesterday = np.mean(close[-121:-1]) if len(close) >= 121 else ma120
+                diff = ma120 - yesterday
+            elif ma_name == 'ma240':
+                yesterday = np.mean(close[-241:-1]) if len(close) >= 241 else ma240
+                diff = ma240 - yesterday
+            else:
+                diff = 0
+            if diff > 0:
+                return "up", diff
+            elif diff < 0:
+                return "down", diff
+            else:
+                return "flat", 0
 
-    if curr > ma60 and ma60 > ma120 and ma120 > ma240:
-        ma_trend = "多頭排列"
-    elif curr < ma60 and ma60 < ma120 and ma120 < ma240:
-        ma_trend = "空頭排列"
-    else:
-        ma_trend = "混亂"
+        ma5_trend, _ = get_ma_trend('ma5')
+        ma10_trend, _ = get_ma_trend('ma10')
+        ma20_trend, _ = get_ma_trend('ma20')
+        ma60_trend, _ = get_ma_trend('ma60')
+        ma120_trend, _ = get_ma_trend('ma120')
+        ma240_trend, _ = get_ma_trend('ma240')
 
-    vol = df['Volume'].values
-    vol_ma20 = np.mean(vol[-20:]) if len(vol) >= 20 else vol[-1]
-    vol_ratio = vol[-1] / vol_ma20 if vol_ma20 > 0 else 1
-    sr = calculate_support_resistance(df, curr)
-    ai_score = calculate_ai_resonance_score(rsi, macd_status, vwap_status, vol_ratio)
+        def price_to_ma_ratio(price, ma):
+            if ma == 0:
+                return 0
+            return (price / ma - 1) * 100
 
-    # AI 模型預測
-    rf_pred_val = xgb_pred_val = lgb_pred_val = None
-    rf_model, rf_scaler = get_rf_model(ticker)
-    if rf_model and rf_scaler:
-        feats = calculate_features(df)
-        if feats:
-            X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
-            X_scaled = rf_scaler.transform(X_pred)
-            rf_pred_val = rf_model.predict(X_scaled)[0] * 100
-    if XGB_AVAILABLE:
-        xgb_model, xgb_scaler = get_xgb_model(ticker)
-        if xgb_model and xgb_scaler:
+        ma5_ratio = price_to_ma_ratio(curr, ma5)
+        ma10_ratio = price_to_ma_ratio(curr, ma10)
+        ma20_ratio = price_to_ma_ratio(curr, ma20)
+        ma60_ratio = price_to_ma_ratio(curr, ma60)
+        ma120_ratio = price_to_ma_ratio(curr, ma120)
+        ma240_ratio = price_to_ma_ratio(curr, ma240)
+
+        if curr > ma60 and ma60 > ma120 and ma120 > ma240:
+            ma_trend = "多頭排列"
+        elif curr < ma60 and ma60 < ma120 and ma120 < ma240:
+            ma_trend = "空頭排列"
+        else:
+            ma_trend = "混亂"
+
+        vol = df['Volume'].values
+        vol_ma20 = np.mean(vol[-20:]) if len(vol) >= 20 else vol[-1]
+        vol_ratio = vol[-1] / vol_ma20 if vol_ma20 > 0 else 1
+        sr = calculate_support_resistance(df, curr)
+        ai_score = calculate_ai_resonance_score(rsi, macd_status, vwap_status, vol_ratio)
+
+        # AI 模型預測
+        rf_pred_val = xgb_pred_val = lgb_pred_val = None
+        rf_model, rf_scaler = get_rf_model(ticker)
+        if rf_model and rf_scaler:
             feats = calculate_features(df)
             if feats:
                 X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
-                X_scaled = xgb_scaler.transform(X_pred)
-                xgb_pred_val = xgb_model.predict(X_scaled)[0] * 100
-    if LGB_AVAILABLE:
-        lgb_model, lgb_scaler = get_lgb_model(ticker)
-        if lgb_model and lgb_scaler:
-            feats = calculate_features(df)
-            if feats:
-                X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
-                X_scaled = lgb_scaler.transform(X_pred)
-                lgb_pred_val = lgb_model.predict(X_scaled)[0] * 100
+                X_scaled = rf_scaler.transform(X_pred)
+                rf_pred_val = rf_model.predict(X_scaled)[0] * 100
+        if XGB_AVAILABLE:
+            xgb_model, xgb_scaler = get_xgb_model(ticker)
+            if xgb_model and xgb_scaler:
+                feats = calculate_features(df)
+                if feats:
+                    X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
+                    X_scaled = xgb_scaler.transform(X_pred)
+                    xgb_pred_val = xgb_model.predict(X_scaled)[0] * 100
+        if LGB_AVAILABLE:
+            lgb_model, lgb_scaler = get_lgb_model(ticker)
+            if lgb_model and lgb_scaler:
+                feats = calculate_features(df)
+                if feats:
+                    X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
+                    X_scaled = lgb_scaler.transform(X_pred)
+                    lgb_pred_val = lgb_model.predict(X_scaled)[0] * 100
 
-    ensemble = ensemble_predict(ticker, df)
-    options = None
-    if market == 'us':
-        options = get_options_signals(ticker)
-    research_links = get_research_links(ticker)
-    reasons = []
-    if rsi < 30:
-        reasons.append("RSI超賣區")
-    elif rsi > 70:
-        reasons.append("RSI超買區")
-    else:
-        reasons.append("RSI中性")
-    if "金叉" in macd_status:
-        reasons.append("MACD黃金交叉")
-    elif "死叉" in macd_status:
-        reasons.append("MACD死亡交叉")
-    else:
-        reasons.append("MACD平穩")
-    if "站上" in vwap_status:
-        reasons.append("站上VWAP")
-    else:
-        reasons.append("跌破VWAP")
-    if vol_ratio > 1.5:
-        reasons.append(f"量能放大 {vol_ratio:.1f}倍")
-    reasons.append("AI綜合評分")
+        ensemble = ensemble_predict(ticker, df)
+        options = None
+        if market == 'us':
+            options = get_options_signals(ticker)
+        research_links = get_research_links(ticker)
+        reasons = []
+        if rsi < 30:
+            reasons.append("RSI超賣區")
+        elif rsi > 70:
+            reasons.append("RSI超買區")
+        else:
+            reasons.append("RSI中性")
+        if "金叉" in macd_status:
+            reasons.append("MACD黃金交叉")
+        elif "死叉" in macd_status:
+            reasons.append("MACD死亡交叉")
+        else:
+            reasons.append("MACD平穩")
+        if "站上" in vwap_status:
+            reasons.append("站上VWAP")
+        else:
+            reasons.append("跌破VWAP")
+        if vol_ratio > 1.5:
+            reasons.append(f"量能放大 {vol_ratio:.1f}倍")
+        reasons.append("AI綜合評分")
 
-    gex_data = calculate_gamma_exposure(ticker)
-    if gex_data:
-        gex_call = gex_data.get('call_wall')
-        gex_put = gex_data.get('put_wall')
-        gex_flip = gex_data.get('gamma_flip_strike')
-    else:
-        gex_call = gex_put = gex_flip = None
-    # 分析異常期權的 Delta 值
-    delta_analysis = analyze_unusual_options(ticker, unusual_opt)
+        gex_data = calculate_gamma_exposure(ticker)
+        if gex_data:
+            gex_call = gex_data.get('call_wall')
+            gex_put = gex_data.get('put_wall')
+            gex_flip = gex_data.get('gamma_flip_strike')
+        else:
+            gex_call = gex_put = gex_flip = None
 
-  
-                # 取得異常期權（僅美股有）
-    if market == 'us':
-        try:
-            unusual_opt = get_unusual_options(ticker)
-        except Exception as e:
-            logger.error(f"取得異常期權失敗: {e}")
+        # 取得異常期權（僅美股有）
+        if market == 'us':
+            try:
+                unusual_opt = get_unusual_options(ticker)
+            except Exception as e:
+                logger.error(f"取得異常期權失敗: {e}")
+                unusual_opt = []
+        else:
             unusual_opt = []
-    else:
-        unusual_opt = []
-    
-    ai_signal = ensemble[1] if ensemble[1] else None
-    tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
-                                               unusual_opt[:2] if unusual_opt else None)
-    
-           # 分析異常期權的 Delta 值（暫時停用以節省記憶體）
-    delta_analysis = []
-    # if market == 'us' and unusual_opt:
-    #     try:
-    #         delta_analysis = analyze_unusual_options(ticker, unusual_opt)
-    #     except Exception as e:
-    #         logger.error(f"Delta 分析失敗: {e}")
-    #         delta_analysis = []
-    # else:
-    #     delta_analysis = []
+        
+        ai_signal = ensemble[1] if ensemble[1] else None
+        tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
+                                                   unusual_opt[:2] if unusual_opt else None)
+        
+        # 分析異常期權的 Delta 值（暫時停用以節省記憶體）
+        delta_analysis = []
+        # if market == 'us' and unusual_opt:
+        #     try:
+        #         delta_analysis = analyze_unusual_options(ticker, unusual_opt)
+        #     except Exception as e:
+        #         logger.error(f"Delta 分析失敗: {e}")
+        #         delta_analysis = []
+        # else:
+        #     delta_analysis = []
 
-    # 取得三大法人資料（用於顯示）
-    foreign, trust, dealer, inst_date = get_institutional_data(ticker)
-    if foreign is not None:
-        inst_display = f"外資:{foreign:,} 投信:{trust:,} 自營:{dealer:,} (日期:{inst_date})"
-        inst_score = calculate_institutional_score(foreign, trust, dealer)
-    else:
-        inst_display = "無資料"
-        inst_score = 50
+        # 取得三大法人資料（用於顯示）
+        foreign, trust, dealer, inst_date = get_institutional_data(ticker)
+        if foreign is not None:
+            inst_display = f"外資:{foreign:,} 投信:{trust:,} 自營:{dealer:,} (日期:{inst_date})"
+            inst_score = calculate_institutional_score(foreign, trust, dealer)
+        else:
+            inst_display = "無資料"
+            inst_score = 50
 
-    return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
-                           pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
-                           macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
-                           ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
-                           ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
-                           volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
-                           resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
-                           rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
-                           xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
-                           lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
-                           ensemble_score=ensemble[0] if ensemble[0] else None,
-                           ensemble_signal=ensemble[1] if ensemble[1] else None,
-                           ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
-                           smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
-                           trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
-                           ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
-                           options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
-                           ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
-                           ma120_trend=ma120_trend, ma240_trend=ma240_trend,
-                           ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
-                           ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
-                           gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                           unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score)
+        return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
+                               pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
+                               macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
+                               ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
+                               ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
+                               volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
+                               resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
+                               rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
+                               xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
+                               lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
+                               ensemble_score=ensemble[0] if ensemble[0] else None,
+                               ensemble_signal=ensemble[1] if ensemble[1] else None,
+                               ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
+                               smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
+                               trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
+                               ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
+                               options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
+                               ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
+                               ma120_trend=ma120_trend, ma240_trend=ma240_trend,
+                               ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
+                               ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
+                               gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
+                               unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score)
+    except Exception as e:
+        logger.error(f"indicators_page 錯誤: {e}", exc_info=True)
+        return f"<h1>錯誤</h1><pre>{e}</pre>", 500
+
 @app.route('/bonding')
 def bonding_page():
     threshold = settings.get('bonding_threshold',3.0)/100
@@ -2545,9 +2447,9 @@ def bonding_page():
         r['ma20'] = clean_nan(r.get('ma20'), 'N/A')
         r['ma60'] = clean_nan(r.get('ma60'), 'N/A')
     return render_template('bonding.html', tw_results=tw_results, us_results=us_results,
-                                  tw_count=len(tw_results), us_count=len(us_results),
-                                  tw_total=len(tw_tickers), us_total=len(us_tickers),
-                                  threshold=settings.get('bonding_threshold',3.0))
+                           tw_count=len(tw_results), us_count=len(us_results),
+                           tw_total=len(tw_tickers), us_total=len(us_tickers),
+                           threshold=settings.get('bonding_threshold',3.0))
 
 @app.route('/settings', methods=['GET','POST'])
 def settings_page():
@@ -2658,24 +2560,12 @@ def alert_stream():
                 time.sleep(5)
 
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
-@app.route('/quote/<ticker>')
-def get_quote(ticker):
-    """取得指定股票的最新即時報價（從 WebSocket）"""
-    stock_id = ticker.upper().replace('.TW', '')
-    with quote_lock:
-        data = latest_quote.get(stock_id, {})
-    if data:
-        return jsonify(data)
-    else:
-        return jsonify({"error": "尚無報價資料"}), 404
-
 
 @app.route('/institutional')
 def institutional_view():
     with closing(get_db_connection()) as conn:
         cur = conn.cursor()
         if DATABASE_URL:
-            # PostgreSQL
             cur.execute('''
                 SELECT stock_id, date, foreign_investors, investment_trust, dealers
                 FROM institutional_ownership
@@ -2684,7 +2574,6 @@ def institutional_view():
             ''')
             rows = [dict(zip([desc[0] for desc in cur.description], row)) for row in cur.fetchall()]
         else:
-            # SQLite
             conn.row_factory = sqlite3.Row
             cur = conn.execute('''
                 SELECT stock_id, date, foreign_investors, investment_trust, dealers
@@ -2693,109 +2582,7 @@ def institutional_view():
                 ORDER BY stock_id
             ''')
             rows = cur.fetchall()
-    return render_template('institutional.html', data=rows)   
-    # 產生 HTML 表格
-    html = '''
-    <!DOCTYPE html>
-    <html>
-    <head><meta charset="UTF-8"><title>三大法人與大戶持股</title>
-    <style>
-        body{font-family:sans-serif;background:#121214;color:#fff;padding:20px;}
-        table{border-collapse:collapse;width:100%;}
-        th,td{border:1px solid #444;padding:8px;text-align:right;}
-        th{background:#2a2a35;text-align:center;}
-        td:first-child{text-align:center;font-weight:bold;}
-        .btn{background:#2a2a35;padding:6px 14px;border-radius:20px;color:white;text-decoration:none;margin:10px 0;display:inline-block;}
-    </style>
-    </head>
-    <body>
-    <a href="/" class="btn">🔙 返回首頁</a>
-    <h1>📊 三大法人買賣超 & 千張大戶持股比率（最新日期）</h1>
-    <table>
-        <thead><tr><th>股票代號</th><th>日期</th><th>外資買賣超</th><th>投信買賣超</th><th>自營商買賣超</th><th>千張大戶持股(%)</th></tr></thead>
-        <tbody>
-    '''
-    for row in rows:
-        html += f'''
-            <tr>
-                <td>{row["stock_id"]}</td>
-                <td>{row["date"]}</td>
-                <td style="color:{"#ff4444" if row["foreign_investors"]>0 else "#00ff00"}">{row["foreign_investors"]:,}</td>
-                <td style="color:{"#ff4444" if row["investment_trust"]>0 else "#00ff00"}">{row["investment_trust"]:,}</td>
-                <td style="color:{"#ff4444" if row["dealers"]>0 else "#00ff00"}">{row["dealers"]:,}</td>
-                <td>{f"{row['holding_ratio']:.2f}%" if row['holding_ratio'] else "-"}</td>
-            </tr>
-        '''
-    html += '''
-        </tbody>
-    </table>
-    </body>
-    </html>
-    '''
-    return html
-
-
-def get_crypto_price_ccxt(symbol, exchange='binance'):
-    try:
-        ex = getattr(ccxt, exchange)()
-        ticker = ex.fetch_ticker(symbol.upper())
-        return ticker.get('last') or ticker.get('ask')
-    except Exception as e:
-        print(f"ccxt error: {e}")
-        return None
-
-
-
-# ================== Shioaji WebSocket 即時報價 ==================
-import shioaji as sj
-import threading
-import time
-
-latest_quote = {}
-quote_lock = threading.Lock()
-
-def start_websocket_stream():
-    """啟動 Shioaji WebSocket 訂閱即時報價"""
-    global latest_quote
-    try:
-        api = sj.Shioaji(simulation=False)
-        api.login(
-            api_key=os.getenv('SHIOAJI_API_KEY'),
-            secret_key=os.getenv('SHIOAJI_SECRET_KEY')
-        )
-        api.activate_ca(
-            ca_path="Sinopac.pfx",
-            ca_passwd=os.getenv('CA_PASSWD', '你的身份證字號'),
-            person_id=os.getenv('CA_PASSWD', '你的身份證字號')
-        )
-        print("Shioaji 已登入並啟用憑證")
-
-        @api.quote.on_tick_stk_v1
-        def quote_callback(exchange, tick):
-            with quote_lock:
-                latest_quote[tick.code] = {
-                    'price': float(tick.close),
-                    'volume': tick.volume,
-                    'total_volume': tick.total_volume,
-                    'datetime': str(tick.datetime)
-                }
-
-        tickers = get_all_tickers('tw')
-        for ticker in tickers:
-            stock_id = ticker.replace('.TW', '')
-            try:
-                contract = api.Contracts.Stocks[stock_id]
-                api.quote.subscribe(contract, quote_type=sj.constant.QuoteType.Tick)
-                print(f"已訂閱 {ticker}")
-            except Exception as e:
-                print(f"訂閱 {ticker} 失敗: {e}")
-
-        # 保持執行（WebSocket 在背景執行）
-        while True:
-            time.sleep(1)
-    except Exception as e:
-        print(f"WebSocket 啟動失敗: {e}")
-
+    return render_template('institutional.html', data=rows)
 
 # ================== 主程式 ==================
 if __name__ == "__main__":
@@ -2803,7 +2590,6 @@ if __name__ == "__main__":
     print("🚀 啟動 AI 量化監控中心 v16_final")
     print(f"📊 訪問地址：0.0.0.0:{os.environ.get('PORT', 5000)}  (debug={debug_mode})")
 
-    # 初始化三大法人資料庫
     init_institutional_db()
 
     scheduler = BackgroundScheduler()
@@ -2844,20 +2630,13 @@ if __name__ == "__main__":
         max_instances=1
     )
     
-    # ========== 手動立即測試三大法人更新（僅測試，完成後請註解） ==========
+    # 手動更新三大法人（測試）
     print("開始手動更新三大法人資料...")
     for t in get_all_tickers('tw'):
         update_institutional_data(t)
-        # 千張大戶暫時停用，避免重定向錯誤
-        # update_large_shareholders_data(t)
     print("手動更新完成")
-    # ========== 手動測試結束 ==========
-             
-    # 啟動 WebSocket 即時訂閱（獨立執行緒）
-    # threading.Thread(target=start_websocket_stream, daemon=True).start()   # 暫時禁用
-
+    
     scheduler.start()
     
-    # 關鍵：從環境變數讀取 PORT，若無則使用 5000；監聽所有外部連線
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=debug_mode, threaded=True)
