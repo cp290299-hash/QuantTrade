@@ -651,6 +651,34 @@ def ensemble_predict(ticker, df):
     return final, signal, details, 0.5, smart, hype, trend, growth, ten_bagger, [], final
 
 # ================== 期權信號計算 ==================
+def calculate_pcr(ticker):
+    """計算 Put/Call 成交量比率"""
+    try:
+        stock = yf.Ticker(ticker)
+        exps = stock.options
+        if not exps: return None
+        opt = stock.option_chain(exps[0])
+        call_vol = opt.calls['volume'].sum()
+        put_vol = opt.puts['volume'].sum()
+        if call_vol == 0: return None
+        return put_vol / call_vol
+    except:
+        return None
+
+def calculate_call_put_wall(ticker):
+    """計算 Call Wall 與 Put Wall（最大未平倉量履約價）"""
+    try:
+        stock = yf.Ticker(ticker)
+        exps = stock.options
+        if not exps: return None, None
+        opt = stock.option_chain(exps[0])
+        call_oi = opt.calls.groupby('strike')['openInterest'].sum()
+        put_oi = opt.puts.groupby('strike')['openInterest'].sum()
+        call_wall = call_oi.idxmax() if not call_oi.empty else None
+        put_wall = put_oi.idxmax() if not put_oi.empty else None
+        return call_wall, put_wall
+    except:
+        return None, None
 def get_options_chain(ticker):
     try:
         stock = yf.Ticker(ticker)
@@ -1285,16 +1313,7 @@ def get_yield_curve_inversion():
     except Exception:
         return None, None, "無法取得殖利率資料"
 def get_cnn_fear_greed():
-    try:
-        import fear_greed
-        data = fear_greed.get()
-        rating_map = {'extreme fear': '極度恐懼', 'fear': '恐懼', 'neutral': '中性', 'greed': '貪婪', 'extreme greed': '極度貪婪'}
-        score = data['score']
-        level = rating_map.get(data['rating'], '中性')
-        return score, level, "https://edition.cnn.com/markets/fear-and-greed"
-    except Exception as e:
-        logger.warning(f"恐懼貪婪指數獲取失敗: {e}")
-        return 50, "中性", "https://edition.cnn.com/markets/fear-and-greed"
+    return 50, "中性", "https://edition.cnn.com/markets/fear-and-greed"
 def get_margin_data():
     url = "https://www.wantgoo.com/stock/margin-trading/utilization-rate-rank"
     balance = "約 3,200 億"
@@ -1458,7 +1477,7 @@ def update_institutional_data(ticker):
     logger.info(f"更新 {ticker} ({data_date}) 三大法人: 外資={foreign}, 投信={trust}, 自營={dealer}")
 
 def update_large_shareholders_data(ticker):
-    ratio = fetch_large_shareholders(ticker)
+    return  # 暫時停用
     if ratio is None:
         logger.warning(f"{ticker} 無千張大戶資料，跳過更新")
         return
@@ -2335,8 +2354,15 @@ def indicators_page(ticker):
 
         ensemble = ensemble_predict(ticker, df)
         options = None
-        if market == 'us':
-            options = get_options_signals(ticker)
+            if market == 'us':
+        options = get_options_signals(ticker)
+        # 新增：計算 PCR 和 Call/Put Wall
+        pcr = calculate_pcr(ticker)
+        call_wall, put_wall = calculate_call_put_wall(ticker)
+    else:
+        options = None
+        pcr = None
+        call_wall = put_wall = None
         research_links = get_research_links(ticker)
         reasons = []
         if rsi < 30:
