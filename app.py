@@ -2354,7 +2354,7 @@ def indicators_page(ticker):
 
         ensemble = ensemble_predict(ticker, df)
         
-        # ----- 計算期權指標（僅美股） -----
+                # ----- 計算期權指標（僅美股） -----
         options = None
         pcr = None
         call_wall = None
