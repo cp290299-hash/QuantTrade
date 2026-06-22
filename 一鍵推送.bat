@@ -39,9 +39,19 @@ set COMMIT_MSG="自動推送 %DATE% %TIME%"
 echo 正在提交...
 git commit -m %COMMIT_MSG%
 
-:: 推送到 GitHub
-echo 正在推送到 GitHub...
-git push
+:: 推送到 GitHub（使用 --force 強制覆蓋遠端）
+echo 正在推送到 GitHub（強制模式）...
+git push --force
+
+:: 檢查推送是否成功
+if %errorlevel% neq 0 (
+    echo.
+    echo ========================================
+    echo 推送失敗！請檢查網路或手動執行 git push。
+    echo ========================================
+    pause
+    exit /b 1
+)
 
 :: 完成
 echo.

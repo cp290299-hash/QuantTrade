@@ -1,0 +1,11 @@
+{
+    "workbench.colorTheme": "Light 2026",
+    "files.autoSave": "afterDelay",
+
+    // 新增以下設定
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "ms-python.autopep8"
+    },
+    "python.formatting.provider": "autopep8"
+}
