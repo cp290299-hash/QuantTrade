@@ -2147,6 +2147,7 @@ def calculate_option_delta(ticker, expiration_date, strike, option_type='call'):
 
 
 def analyze_unusual_options(ticker, unusual_options):
+    """分析異常期權，輸出 Delta、價內/價外狀態與綜合判斷"""
     if not unusual_options:
         return []
     import re
@@ -2163,6 +2164,7 @@ def analyze_unusual_options(ticker, unusual_options):
             return [{"summary": f"無法獲取期權到期日: {e}"}]
         if not exps:
             return [{"summary": "該股票目前無期權數據"}]
+
         analysis = []
         for opt in unusual_options:
             match = re.search(r'Call \$([\d.]+)', opt)
@@ -2171,13 +2173,13 @@ def analyze_unusual_options(ticker, unusual_options):
             strike = float(match.group(1))
             expiration_date = exps[0]
             try:
-                delta_val = calculate_option_delta(
-                    ticker, expiration_date, strike, 'call')
+                delta_val = calculate_option_delta(ticker, expiration_date, strike, 'call')
             except Exception as e:
                 print(f"計算 Delta 失敗: {e}")
                 delta_val = None
             if delta_val is None:
                 continue
+            # 與 current_price 比較判斷價內/價外
             moneyness = "價內" if strike < current_price else "價外" if strike > current_price else "價平"
             if delta_val >= 0.7:
                 strength = "高敏感（深度價內）"
@@ -2195,10 +2197,7 @@ def analyze_unusual_options(ticker, unusual_options):
         return analysis
     except Exception as e:
         print(f"analyze_unusual_options 整體錯誤: {e}")
-        return [{"summary": f"分析過程中發生錯誤: {str(e)}"}]
-
-
-def get_unusual_options(ticker):
+        return [{"summary": f"分析過程中發生錯誤: {str(e)}"}]def get_unusual_options(ticker):
     try:
         tk = yf.Ticker(ticker)
         exps = tk.options
@@ -2702,261 +2701,7 @@ def positions_page():
 
 
 @app.route('/indicators/<ticker>')
-def indicators_page(ticker):
-    try:
-        import urllib.parse
-        ticker = urllib.parse.unquote(ticker).upper()
-        market = 'tw' if '.TW' in ticker else 'us'
-        unusual_opt = []   # 強制初始化
-
-        if market == 'tw':
-            curr, change, pct, df = get_tw_stock_data(ticker)
-        else:
-            curr, change, pct, df = get_us_stock_data(ticker)
-        if df.empty or curr == 0 or math.isnan(curr):
-            return render_template('indicators.html', ticker=ticker, error="無法取得有效股價資料")
-
-        close = df['Close'].dropna().values
-        if len(close) < 2:
-            return render_template('indicators.html', ticker=ticker, error="歷史收盤價不足 (少於2天)")
-
-        if len(close) >= 5:
-            ma5 = np.mean(close[-5:])
-            ma10 = np.mean(close[-10:]) if len(close) >= 10 else close[-1]
-            ma20 = np.mean(close[-20:]) if len(close) >= 20 else close[-1]
-            ma60 = np.mean(close[-60:]) if len(close) >= 60 else close[-1]
-            ma120 = np.mean(close[-120:]) if len(close) >= 120 else close[-1]
-            ma240 = np.mean(close[-240:]) if len(close) >= 240 else close[-1]
-        else:
-            ma5 = ma10 = ma20 = ma60 = ma120 = ma240 = curr
-
-        for var in ['ma5', 'ma10', 'ma20', 'ma60', 'ma120', 'ma240']:
-            if np.isnan(locals()[var]):
-                locals()[var] = curr
-
-        close_series = safe_get_close(df)
-        if len(close_series) >= 15:
-            deltas = np.diff(close_series[-15:])
-            gain = np.mean(deltas[deltas > 0]) if any(deltas > 0) else 0
-            loss = -np.mean(deltas[deltas < 0]) if any(deltas < 0) else 0
-            rsi = 100 - 100 / (1 + (gain / loss if loss else 1))
-        else:
-            rsi = 50
-        if rsi < 30:
-            rsi_status = "🔴 超賣 (可能反彈)"
-        elif rsi < 50:
-            rsi_status = "🟡 弱勢"
-        elif rsi < 70:
-            rsi_status = "🟢 強勢"
-        else:
-            rsi_status = "⚠️ 超買 (注意回檔)"
-
-        if len(close_series) >= 35:
-            _, _, hist, macd_status = calculate_macd(close_series)
-        else:
-            macd_status, hist = "-", 0
-
-        vwap = calculate_vwap(df)
-        vwap_status = get_vwap_status(curr, vwap) if vwap else "N/A"
-
-        def get_ma_trend(ma_name):
-            if len(close) < 2:
-                return "flat", 0
-            if ma_name == 'ma5':
-                yesterday = np.mean(close[-6:-1]) if len(close) >= 6 else ma5
-                diff = ma5 - yesterday
-            elif ma_name == 'ma10':
-                yesterday = np.mean(
-                    close[-11:-1]) if len(close) >= 11 else ma10
-                diff = ma10 - yesterday
-            elif ma_name == 'ma20':
-                yesterday = np.mean(
-                    close[-21:-1]) if len(close) >= 21 else ma20
-                diff = ma20 - yesterday
-            elif ma_name == 'ma60':
-                yesterday = np.mean(
-                    close[-61:-1]) if len(close) >= 61 else ma60
-                diff = ma60 - yesterday
-            elif ma_name == 'ma120':
-                yesterday = np.mean(
-                    close[-121:-1]) if len(close) >= 121 else ma120
-                diff = ma120 - yesterday
-            elif ma_name == 'ma240':
-                yesterday = np.mean(
-                    close[-241:-1]) if len(close) >= 241 else ma240
-                diff = ma240 - yesterday
-            else:
-                diff = 0
-            if diff > 0:
-                return "up", diff
-            elif diff < 0:
-                return "down", diff
-            else:
-                return "flat", 0
-
-        ma5_trend, _ = get_ma_trend('ma5')
-        ma10_trend, _ = get_ma_trend('ma10')
-        ma20_trend, _ = get_ma_trend('ma20')
-        ma60_trend, _ = get_ma_trend('ma60')
-        ma120_trend, _ = get_ma_trend('ma120')
-        ma240_trend, _ = get_ma_trend('ma240')
-
-        def price_to_ma_ratio(price, ma):
-            if ma == 0:
-                return 0
-            return (price / ma - 1) * 100
-
-        ma5_ratio = price_to_ma_ratio(curr, ma5)
-        ma10_ratio = price_to_ma_ratio(curr, ma10)
-        ma20_ratio = price_to_ma_ratio(curr, ma20)
-        ma60_ratio = price_to_ma_ratio(curr, ma60)
-        ma120_ratio = price_to_ma_ratio(curr, ma120)
-        ma240_ratio = price_to_ma_ratio(curr, ma240)
-
-        if curr > ma60 and ma60 > ma120 and ma120 > ma240:
-            ma_trend = "多頭排列"
-        elif curr < ma60 and ma60 < ma120 and ma120 < ma240:
-            ma_trend = "空頭排列"
-        else:
-            ma_trend = "混亂"
-
-        vol = df['Volume'].values
-        vol_ma20 = np.mean(vol[-20:]) if len(vol) >= 20 else vol[-1]
-        vol_ratio = vol[-1] / vol_ma20 if vol_ma20 > 0 else 1
-        sr = calculate_support_resistance(df, curr)
-        ai_score = calculate_ai_resonance_score(
-            rsi, macd_status, vwap_status, vol_ratio)
-
-        # AI 模型預測
-        rf_pred_val = xgb_pred_val = lgb_pred_val = None
-        rf_model, rf_scaler = get_rf_model(ticker)
-        if rf_model and rf_scaler:
-            feats = calculate_features(df)
-            if feats:
-                X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
-                X_scaled = rf_scaler.transform(X_pred)
-                rf_pred_val = rf_model.predict(X_scaled)[0] * 100
-        if XGB_AVAILABLE:
-            xgb_model, xgb_scaler = get_xgb_model(ticker)
-            if xgb_model and xgb_scaler:
-                feats = calculate_features(df)
-                if feats:
-                    X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
-                    X_scaled = xgb_scaler.transform(X_pred)
-                    xgb_pred_val = xgb_model.predict(X_scaled)[0] * 100
-
-        if LGB_AVAILABLE:
-            lgb_model, lgb_scaler = get_lgb_model(ticker)
-            if lgb_model and lgb_scaler:
-                feats = calculate_features(df)
-                if feats:
-                    X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
-                    X_scaled = lgb_scaler.transform(X_pred)
-                    lgb_pred_val = lgb_model.predict(X_scaled)[0] * 100
-
-        ensemble = ensemble_predict(ticker, df)
-        # ----- 計算期權指標（僅美股） -----
-        options = None
-        pcr = None
-        call_wall = None
-        put_wall = None
-        if market == 'us':
-            options = get_options_signals(ticker)
-            pcr = calculate_pcr(ticker)
-            call_wall, put_wall = calculate_call_put_wall(ticker)
-        # ---------------------------------
-
-        research_links = get_research_links(ticker)
-        reasons = []
-        if rsi < 30:
-            reasons.append("RSI超賣區")
-        elif rsi > 70:
-            reasons.append("RSI超買區")
-        else:
-            reasons.append("RSI中性")
-        if "金叉" in macd_status:
-            reasons.append("MACD黃金交叉")
-        elif "死叉" in macd_status:
-            reasons.append("MACD死亡交叉")
-        else:
-            reasons.append("MACD平穩")
-        if "站上" in vwap_status:
-            reasons.append("站上VWAP")
-        else:
-            reasons.append("跌破VWAP")
-        if vol_ratio > 1.5:
-            reasons.append(f"量能放大 {vol_ratio:.1f}倍")
-        reasons.append("AI綜合評分")
-
-        gex_data = calculate_gamma_exposure(ticker)
-        if gex_data:
-            gex_call = gex_data.get('call_wall')
-            gex_put = gex_data.get('put_wall')
-            gex_flip = gex_data.get('gamma_flip_strike')
-        else:
-            gex_call = gex_put = gex_flip = None
-
-        # 取得異常期權（僅美股有）
-        if market == 'us':
-            try:
-                unusual_opt = get_unusual_options(ticker)
-            except Exception as e:
-                logger.error(f"取得異常期權失敗: {e}")
-                unusual_opt = []
-        else:
-            unusual_opt = []
-        
-        ai_signal = ensemble[1] if ensemble[1] else None
-        tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
-                                                   unusual_opt[:2] if unusual_opt else None)
-        # 自動戰術建議（綜合 GEX、Delta、PCR、均線）
-        trading_suggestion = generate_trading_suggestion(
-            ticker, market, curr, gex_data, delta_analysis, pcr, ma_trend
-        )
-        
-               # 分析異常期權的 Delta 值（僅美股且有異常期權時計算）
-        delta_analysis = []
-        if market == 'us' and unusual_opt:
-            try:
-                delta_analysis = analyze_unusual_options(ticker, unusual_opt)
-            except Exception as e:
-                logger.error(f"Delta 分析失敗: {e}")
-                delta_analysis = []
-
-        # 取得三大法人資料（用於顯示）
-        foreign, trust, dealer, inst_date = get_institutional_data(ticker)
-        if foreign is not None:
-            inst_display = f"外資:{foreign:,} 投信:{trust:,} 自營:{dealer:,} (日期:{inst_date})"
-            inst_score = calculate_institutional_score(foreign, trust, dealer)
-        else:
-            inst_display = "無資料"
-            inst_score = 50
-
-        return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
-                               pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
-                               macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
-                               ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
-                               ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
-                               volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
-                               resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
-                               rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
-                               xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
-                               lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
-                               ensemble_score=ensemble[0] if ensemble[0] else None,
-                               ensemble_signal=ensemble[1] if ensemble[1] else None,
-                               ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
-                               smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
-                               trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
-                               ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
-                               options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
-                               ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
-                               ma120_trend=ma120_trend, ma240_trend=ma240_trend,
-                               ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
-                               ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
-                               gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                               unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
-                               pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion)
-@app.route('/bonding')
+def indicators_page(ticker):@app.route('/bonding')
 def bonding_page():
     threshold = settings.get('bonding_threshold',3.0)/100
     tw_tickers = get_all_tickers('tw'); us_tickers = get_all_tickers('us')
