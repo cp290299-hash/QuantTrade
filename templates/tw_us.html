@@ -16,6 +16,29 @@
 </head>
 <body>
 <h1>{{ title }}</h1>
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; flex-wrap:wrap; gap:10px;">
+    <h2>{{ title }}</h2>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label style="color:#aaa; font-size:14px;">排序：</label>
+        <select id="sortSelect" style="background:#2a2a35; color:#fff; padding:6px 12px; border-radius:8px; border:1px solid #444; font-size:14px;">
+            <option value="ai_score" {% if sort_by == 'ai_score' %}selected{% endif %}>AI評分（高→低）</option>
+            <option value="pct" {% if sort_by == 'pct' %}selected{% endif %}>漲跌幅（高→低）</option>
+            <option value="price" {% if sort_by == 'price' %}selected{% endif %}>價格（高→低）</option>
+            <option value="change" {% if sort_by == 'change' %}selected{% endif %}>漲跌金額（高→低）</option>
+        </select>
+        <button onclick="applySort()" class="btn" style="background:#2196f3;">排序</button>
+    </div>
+</div>
+
+<script>
+function applySort() {
+    var sortBy = document.getElementById('sortSelect').value;
+    var currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('sort_by', sortBy);
+    currentUrl.searchParams.set('order', 'desc');
+    window.location.href = currentUrl.toString();
+}
+</script>
 <div><a href="/" class="btn">返回儀表板</a> <a href="/ai_ranking" class="btn">🏆 AI排行榜</a></div>
 <div class="card">
     <div class="index-grid">

@@ -2939,20 +2939,42 @@ def tw_page():
     dow_curr, dow_change, dow_pct = get_dow_index()
     nas_curr, nas_change, nas_pct = get_nasdaq_index()
     sox_curr, sox_change, sox_pct = get_phlx_index()
+    
+    # 取得排序參數（預設按 ai_score 降序）
+    sort_by = request.args.get('sort_by', 'ai_score')
+    order = request.args.get('order', 'desc')
+    
     try:
         all_stocks = json.load(open(AI_SCORES_FILE, 'r', encoding='utf-8'))
         stocks = [s for s in all_stocks if s.get('market') == 'tw']
     except:
         stocks = []
-    stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
-    return render_template('tw_us.html', market='tw', stocks=stocks, title="台股監控 - 所有自選股",
+    
+    # 排序
+    reverse = (order == 'desc')
+    if sort_by == 'ai_score':
+        stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=reverse)
+    elif sort_by == 'pct':
+        stocks.sort(key=lambda x: x.get('pct', 0), reverse=reverse)
+    elif sort_by == 'price':
+        stocks.sort(key=lambda x: x.get('price', 0), reverse=reverse)
+    elif sort_by == 'change':
+        stocks.sort(key=lambda x: x.get('change', 0), reverse=reverse)
+    else:
+        stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
+    
+    return render_template('tw_us.html', 
+                           market='tw', 
+                           stocks=stocks, 
+                           title="台股監控 - 所有自選股",
+                           sort_by=sort_by,
+                           order=order,
                            tw_curr=tw_curr, tw_change=tw_change, tw_pct=tw_pct,
                            otc_curr=otc_curr, otc_change=otc_change, otc_pct=otc_pct,
                            dow_curr=dow_curr, dow_change=dow_change, dow_pct=dow_pct,
                            nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
                            sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
                            shioaji_status=get_shioaji_status())
-
 
 @app.route('/us')
 def us_page():
@@ -2961,20 +2983,40 @@ def us_page():
     dow_curr, dow_change, dow_pct = get_dow_index()
     nas_curr, nas_change, nas_pct = get_nasdaq_index()
     sox_curr, sox_change, sox_pct = get_phlx_index()
+    
+    sort_by = request.args.get('sort_by', 'ai_score')
+    order = request.args.get('order', 'desc')
+    
     try:
         all_stocks = json.load(open(AI_SCORES_FILE, 'r', encoding='utf-8'))
         stocks = [s for s in all_stocks if s.get('market') == 'us']
     except:
         stocks = []
-    stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
-    return render_template('tw_us.html', market='us', stocks=stocks, title="美股監控 - 所有自選股",
+    
+    reverse = (order == 'desc')
+    if sort_by == 'ai_score':
+        stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=reverse)
+    elif sort_by == 'pct':
+        stocks.sort(key=lambda x: x.get('pct', 0), reverse=reverse)
+    elif sort_by == 'price':
+        stocks.sort(key=lambda x: x.get('price', 0), reverse=reverse)
+    elif sort_by == 'change':
+        stocks.sort(key=lambda x: x.get('change', 0), reverse=reverse)
+    else:
+        stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
+    
+    return render_template('tw_us.html', 
+                           market='us', 
+                           stocks=stocks, 
+                           title="美股監控 - 所有自選股",
+                           sort_by=sort_by,
+                           order=order,
                            tw_curr=tw_curr, tw_change=tw_change, tw_pct=tw_pct,
                            otc_curr=otc_curr, otc_change=otc_change, otc_pct=otc_pct,
                            dow_curr=dow_curr, dow_change=dow_change, dow_pct=dow_pct,
                            nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
                            sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
                            shioaji_status=get_shioaji_status())
-
 
 @app.route('/ai_ranking')
 def ai_ranking():
