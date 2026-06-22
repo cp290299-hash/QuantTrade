@@ -1,44 +1,324 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><title>{{ ticker }} 技術指標</title><style>body{background:#121214;color:#fff;padding:20px;font-family:sans-serif;}.card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}.metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;}.metric{background:#2a2a35;padding:10px;border-radius:8px;}.btn{background:#2a2a35;padding:8px 14px;border-radius:20px;color:white;text-decoration:none;display:inline-block;margin:5px;}.btn-green{background:#2e7d32;}.btn-blue{background:#1565c0;}.btn-orange{background:#e65100;}.btn-red{background:#c62828;}.link-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}.ma-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}.ma-metric{position:relative;overflow:hidden;transition:transform 0.2s;}.ma-metric:hover{transform:translateY(-2px);background:#353540;}.ma-label{font-size:12px;color:#aaa;margin-bottom:5px;display:flex;justify-content:space-between;}.ma-value{font-size:18px;font-weight:bold;display:flex;align-items:center;gap:6px;margin-bottom:4px;}.trend-up{color:#ff4444;font-size:14px;}.trend-down{color:#00ff00;font-size:14px;}.trend-flat{color:#ffaa00;font-size:12px;}.progress-bar-container{background-color:#333;border-radius:10px;height:6px;margin:6px 0 4px;overflow:hidden;}.progress-bar-fill{height:100%;border-radius:10px;transition:width 0.3s;}.ratio-text{font-size:10px;text-align:right;color:#ccc;}.badge{padding:4px 12px;border-radius:20px;font-size:14px;font-weight:bold;display:inline-flex;align-items:center;gap:6px;}.badge.bull{background-color:rgba(255,68,68,0.2);color:#ff4444;border:1px solid #ff4444;}.badge.bear{background-color:rgba(0,255,0,0.2);color:#00ff00;border:1px solid #00ff00;}.badge.neutral{background-color:rgba(255,170,0,0.2);color:#ffaa00;border:1px solid #ffaa00;}.pulse{display:inline-block;width:10px;height:10px;border-radius:50%;background-color:currentColor;animation:pulse 1.5s infinite;}@keyframes pulse{0%{opacity:0.4;transform:scale(0.8);}70%{opacity:1;transform:scale(1.2);}100%{opacity:0.4;transform:scale(0.8);}}.tooltip-hover{cursor:help;border-bottom:1px dotted #888;}.alert-box{background:#2a2a35;border-left:4px solid #ffaa00;padding:10px;margin-bottom:15px;border-radius:8px;}.unusual-box{background:#1e2a1e;border-left:4px solid #ffaa00;padding:8px;margin-top:10px;font-size:12px;}</style></head><body><h1>📈 {{ ticker }} 技術指標</h1><div><a href="/" class="btn">返回首頁</a> <a href="/backtest/{{ ticker }}" class="btn">📊 回測</a> <a href="/simulator/{{ ticker }}" class="btn btn-orange">🎯 情境模擬器</a> <a href="/earnings_simulator/{{ ticker }}" class="btn btn-blue">📊 財報模擬器</a></div><div class="link-buttons"><a href="/gex_plot/{{ ticker }}" target="_blank" class="btn btn-green">📊 本地 GEX</a>{% if market == 'us' %}<a href="{{ research_links.MarketWatch }}" target="_blank" class="btn btn-blue">📈 MarketWatch</a><a href="{{ research_links.Barchart }}" target="_blank" class="btn btn-orange">📊 Barchart 期權</a><a href="{{ research_links.Finviz }}" target="_blank" class="btn">🔍 Finviz</a><a href="{{ research_links.Reddit }}" target="_blank" class="btn btn-red">💬 Reddit</a>{% else %}<a href="{{ research_links.WantGoo }}" target="_blank" class="btn btn-blue">🇹🇼 玩股網</a><a href="{{ research_links.GoodInfo }}" target="_blank" class="btn btn-orange">📊 GoodInfo</a><a href="{{ research_links.Google }}" target="_blank" class="btn">🔍 Google 新聞</a>{% endif %}<a href="{{ research_links.TradingView }}" target="_blank" class="btn btn-blue">📈 TradingView</a><a href="{{ research_links.Yahoo }}" target="_blank" class="btn">📰 Yahoo 財經</a></div>{% if error %}<div class="card">{{ error }}</div>{% else %}<div class="card"><h3>即時報價</h3><div class="metric-grid"><div class="metric">價格: {{ price }}</div><div class="metric">漲跌: {{ change }} ({{ pct }}%)</div><div class="metric">AI評分: {{ ai_score }}/100</div><div class="metric"><!-- 加密貨幣即時報價區塊（僅適用於 SPCX-USDC） -->
-
-<script>
-    function fetchCryptoPrice() {
-        fetch('/crypto_price/SPCX-USDC')
-            .then(response => response.json())
-            .then(data => {
-                const displayDiv = document.getElementById('crypto_price_display');
-                if (data.price) {
-                    displayDiv.innerHTML = `💰 最新價: ${data.price} USDC`;
-                } else {
-                    displayDiv.innerHTML = '⚠️ 無法獲取價格';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('crypto_price_display').innerHTML = '⚠️ 報價服務異常';
-            });
-    }
-
-    // 頁面載入時立即抓取一次，之後每 10 秒更新一次
-    fetchCryptoPrice();
-    setInterval(fetchCryptoPrice, 10000);
-</script>報價類型: {% if market == 'tw' %}{% if shioaji_status == '🟢 即時模式' %}🟢 即時 (Shioaji){% else %}🔴 延遲 (Yahoo){% endif %}{% else %}🔵 延遲 15分鐘 (Yahoo){% endif %}</div></div></div>
-
-<div class="card"><h3>⚔️ 戰術建議</h3><div class="alert-box">{{ tactical_advice }}</div>{% if unusual_options %}<div class="unusual-box">📢 異常期權活動: {{ unusual_options|join(' | ') }}</div>{% endif %}</div>
-
-<!-- Delta 分析區塊（如果存在異常期權） -->
-{% if delta_analysis %}
-<div class="card">
-    <h3>📐 異常期權 Delta 分析</h3>
-    <ul>
-        {% for item in delta_analysis %}
-        <li>{{ item.summary }}</li>
-        {% endfor %}
-    </ul>
-    <p style="font-size:13px; color:#aaa;">💡 Delta 值介於 0~1 之間，數值越大代表該履約價的 Call 期權對股價上漲越敏感。</p>
-    <p style="font-size:13px; color:#aaa;">📌 價內 Call 的 Delta 接近 1，價外 Call 的 Delta 接近 0。</p>
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>{{ ticker }} 技術指標</title>
+<style>
+    body{background:#121214;color:#fff;padding:20px;font-family:sans-serif;}
+    .card{background:#1e1e1e;padding:15px;border-radius:12px;margin-bottom:20px;}
+    .metric-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:15px;}
+    .metric{background:#2a2a35;padding:10px;border-radius:8px;}
+    .btn{background:#2a2a35;padding:8px 14px;border-radius:20px;color:white;text-decoration:none;display:inline-block;margin:5px;}
+    .btn-green{background:#2e7d32;}
+    .btn-blue{background:#1565c0;}
+    .btn-orange{background:#e65100;}
+    .btn-red{background:#c62828;}
+    .link-buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+    .ma-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+    .ma-metric{position:relative;overflow:hidden;transition:transform 0.2s;}
+    .ma-metric:hover{transform:translateY(-2px);background:#353540;}
+    .ma-label{font-size:12px;color:#aaa;margin-bottom:5px;display:flex;justify-content:space-between;}
+    .ma-value{font-size:18px;font-weight:bold;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+    .trend-up{color:#ff4444;font-size:14px;}
+    .trend-down{color:#00ff00;font-size:14px;}
+    .trend-flat{color:#ffaa00;font-size:12px;}
+    .progress-bar-container{background-color:#333;border-radius:10px;height:6px;margin:6px 0 4px;overflow:hidden;}
+    .progress-bar-fill{height:100%;border-radius:10px;transition:width 0.3s;}
+    .ratio-text{font-size:10px;text-align:right;color:#ccc;}
+    .badge{padding:4px 12px;border-radius:20px;font-size:14px;font-weight:bold;display:inline-flex;align-items:center;gap:6px;}
+    .badge.bull{background-color:rgba(255,68,68,0.2);color:#ff4444;border:1px solid #ff4444;}
+    .badge.bear{background-color:rgba(0,255,0,0.2);color:#00ff00;border:1px solid #00ff00;}
+    .badge.neutral{background-color:rgba(255,170,0,0.2);color:#ffaa00;border:1px solid #ffaa00;}
+    .pulse{display:inline-block;width:10px;height:10px;border-radius:50%;background-color:currentColor;animation:pulse 1.5s infinite;}@keyframes pulse{0%{opacity:0.4;transform:scale(0.8);}70%{opacity:1;transform:scale(1.2);}100%{opacity:0.4;transform:scale(0.8);}}
+    .tooltip-hover{cursor:help;border-bottom:1px dotted #888;}
+    .alert-box{background:#2a2a35;border-left:4px solid #ffaa00;padding:10px;margin-bottom:15px;border-radius:8px;}
+    .unusual-box{background:#1e2a1e;border-left:4px solid #ffaa00;padding:8px;margin-top:10px;font-size:12px;}
+    .crypto-box{display:none;} /* 隱藏加密貨幣區塊 */
+</style>
+</head>
+<body>
+<h1>📈 {{ ticker }} 技術指標</h1>
+<div>
+    <a href="/" class="btn">返回首頁</a>
+    <a href="/backtest/{{ ticker }}" class="btn">📊 回測</a>
+    <a href="/simulator/{{ ticker }}" class="btn btn-orange">🎯 情境模擬器</a>
+    <a href="/earnings_simulator/{{ ticker }}" class="btn btn-blue">📊 財報模擬器</a>
 </div>
+<div class="link-buttons">
+    <a href="/gex_plot/{{ ticker }}" target="_blank" class="btn btn-green">📊 本地 GEX</a>
+    {% if market == 'us' %}
+        <a href="{{ research_links.MarketWatch }}" target="_blank" class="btn btn-blue">📈 MarketWatch</a>
+        <a href="{{ research_links.Barchart }}" target="_blank" class="btn btn-orange">📊 Barchart 期權</a>
+        <a href="{{ research_links.Finviz }}" target="_blank" class="btn">🔍 Finviz</a>
+        <a href="{{ research_links.Reddit }}" target="_blank" class="btn btn-red">💬 Reddit</a>
+    {% else %}
+        <a href="{{ research_links.WantGoo }}" target="_blank" class="btn btn-blue">🇹🇼 玩股網</a>
+        <a href="{{ research_links.GoodInfo }}" target="_blank" class="btn btn-orange">📊 GoodInfo</a>
+        <a href="{{ research_links.Google }}" target="_blank" class="btn">🔍 Google 新聞</a>
+    {% endif %}
+    <a href="{{ research_links.TradingView }}" target="_blank" class="btn btn-blue">📈 TradingView</a>
+    <a href="{{ research_links.Yahoo }}" target="_blank" class="btn">📰 Yahoo 財經</a>
+</div>
+
+{% if error %}
+    <div class="card">{{ error }}</div>
+{% else %}
+
+    <!-- 即時報價 -->
+    <div class="card">
+        <h3>即時報價</h3>
+        <div class="metric-grid">
+            <div class="metric">價格: {{ price }}</div>
+            <div class="metric">漲跌: {{ change }} ({{ pct }}%)</div>
+            <div class="metric">AI評分: {{ ai_score }}/100</div>
+            <div class="metric">
+                報價類型: {% if market == 'tw' %}
+                    {% if shioaji_status == '🟢 即時模式' %}🟢 即時 (Shioaji){% else %}🔴 延遲 (Yahoo){% endif %}
+                {% else %}
+                    🔵 延遲 15分鐘 (Yahoo)
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 戰術建議 + 大戶動向 -->
+    <div class="card">
+        <h3>⚔️ 戰術建議</h3>
+        <div class="alert-box">{{ tactical_advice }}</div>
+        {% if unusual_options %}
+        <div class="unusual-box">
+            <strong>📢 大戶動向：</strong><br>
+            {% for opt in unusual_options %}
+                • {{ opt }}<br>
+            {% endfor %}
+            <span style="font-size:13px;color:#aaa;">💡 成交量突然放大 3 倍以上，表示有大戶在押注特定價位。</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Delta 分析 -->
+    {% if delta_analysis %}
+    <div class="card">
+        <h3>📐 異常期權 Delta 分析</h3>
+        <ul>
+            {% for item in delta_analysis %}
+            <li>{{ item.summary }}</li>
+            {% endfor %}
+        </ul>
+        <p style="font-size:13px; color:#aaa;">💡 Delta 值介於 0~1 之間，數值越大代表該履約價的 Call 期權對股價上漲越敏感。</p>
+        <p style="font-size:13px; color:#aaa;">📌 價內 Call 的 Delta 接近 1，價外 Call 的 Delta 接近 0。</p>
+    </div>
+    {% endif %}
+
+    <!-- 核心指標 -->
+    <div class="card">
+        <h3>核心指標</h3>
+        <div class="metric-grid">
+            <div class="metric">RSI: {{ rsi }} {{ rsi_status }}</div>
+            <div class="metric">MACD: {{ macd_status }}</div>
+            <div class="metric">VWAP: {{ vwap_status }}</div>
+            <div class="metric">量比: {{ volume_ratio }}</div>
+        </div>
+    </div>
+
+    <!-- AI預測 -->
+    <div class="card">
+        <h3>🤖 AI預測</h3>
+        <div class="metric-grid">
+            <div class="metric"><strong>RandomForest</strong><br>預期漲跌: {{ rf_pred if rf_pred else 'N/A' }}</div>
+            <div class="metric"><strong>XGBoost</strong><br>預期漲跌: {{ xgb_pred if xgb_pred else 'N/A' }}</div>
+            <div class="metric"><strong>LightGBM</strong><br>預期漲跌: {{ lgb_pred if lgb_pred else 'N/A' }}</div>
+            <div class="metric"><strong>綜合評分</strong><br>{% if ensemble_score %}{{ ensemble_score }}/100<br><strong>{{ ensemble_signal }}</strong>{% else %}訓練中...{% endif %}</div>
+        </div>
+    </div>
+
+    <!-- 因子 -->
+    <div class="card">
+        <h3>📊 因子</h3>
+        <div class="metric-grid">
+            <div class="metric">💰 籌碼: {{ smart_score }}</div>
+            <div class="metric">📈 趨勢: {{ trend_score }}</div>
+            <div class="metric">📈 成長: {{ growth_score }}</div>
+            <div class="metric">🚀 十倍股: {{ ten_bagger_score }}</div>
+        </div>
+    </div>
+
+    <!-- 均線分析 -->
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+            <h3 style="margin:0;" class="tooltip-hover" title="均線趨勢與乖離率分析。紅色箭頭=均線上漲；進度條紅色=股價站上均線。">📈 均線分析</h3>
+            <div class="badge {% if ma_trend == '多頭排列' %}bull{% elif ma_trend == '空頭排列' %}bear{% else %}neutral{% endif %}" title="{% if ma_trend == '多頭排列' %}短期均線 > 中期 > 長期，技術強勢{% elif ma_trend == '空頭排列' %}長期均線壓制，技術弱勢{% else %}均線交錯，方向不明{% endif %}">
+                <span class="pulse"></span>{% if ma_trend == '多頭排列' %}🐂 多頭排列{% elif ma_trend == '空頭排列' %}🐻 空頭排列{% else %}⚖️ 混亂{% endif %}
+            </div>
+        </div>
+        <div class="ma-grid">
+            <div class="metric ma-metric">
+                <div class="ma-label">5MA</div>
+                <div class="ma-value">{{ "%.2f"|format(ma5) }}{% if ma5_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma5_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div>
+                <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma5_ratio }}%;background-color:{% if ma5_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div>
+                <div class="ratio-text">{{ "%.1f"|format(ma5_ratio) }}%</div>
+            </div>
+            <div class="metric ma-metric">
+                <div class="ma-label">10MA</div>
+                <div class="ma-value">{{ "%.2f"|format(ma10) }}{% if ma10_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma10_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div>
+                <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma10_ratio }}%;background-color:{% if ma10_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div>
+                <div class="ratio-text">{{ "%.1f"|format(ma10_ratio) }}%</div>
+            </div>
+            <div class="metric ma-metric">
+                <div class="ma-label">20MA</div>
+                <div class="ma-value">{{ "%.2f"|format(ma20) }}{% if ma20_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma20_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div>
+                <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma20_ratio }}%;background-color:{% if ma20_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div>
+                <div class="ratio-text">{{ "%.1f"|format(ma20_ratio) }}%</div>
+            </div>
+            <div class="metric ma-metric">
+                <div class="ma-label">60MA</div>
+                <div class="ma-value">{{ "%.2f"|format(ma60) }}{% if ma60_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma60_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div>
+                <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma60_ratio }}%;background-color:{% if ma60_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div>
+                <div class="ratio-text">{{ "%.1f"|format(ma60_ratio) }}%</div>
+            </div>
+            <div class="metric ma-metric">
+                <div class="ma-label">120MA</div>
+                <div class="ma-value">{{ "%.2f"|format(ma120) }}{% if ma120_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma120_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div>
+                <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma120_ratio }}%;background-color:{% if ma120_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div>
+                <div class="ratio-text">{{ "%.1f"|format(ma120_ratio) }}%</div>
+            </div>
+            <div class="metric ma-metric">
+                <div class="ma-label">240MA</div>
+                <div class="ma-value">{{ "%.2f"|format(ma240) }}{% if ma240_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma240_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div>
+                <div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma240_ratio }}%;background-color:{% if ma240_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div>
+                <div class="ratio-text">{{ "%.1f"|format(ma240_ratio) }}%</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 壓力支撐 -->
+    <div class="card">
+        <h3>壓力支撐</h3>
+        <div class="metric-grid">
+            <div class="metric">🔴 壓力: {{ resistance }}</div>
+            <div class="metric">🟢 目標: {{ target }}</div>
+            <div class="metric">⚪ 停損: {{ stop_loss }}</div>
+        </div>
+    </div>
+
+    <!-- 價格警戒線 (GEX) 白話版 -->
+    <div class="card">
+        <h3>📌 價格警戒線 (GEX)</h3>
+        <div class="metric-grid">
+            <div class="metric" style="background:#1e2a1e;border-left:3px solid #00ff00;">
+                <strong>📈 上方壓力（漲不動的價位）</strong><br>
+                ${{ gex_call if gex_call else '尚無數據' }}
+                <span style="font-size:12px;color:#aaa;">（股價到這裡容易遇到賣壓）</span>
+            </div>
+            <div class="metric" style="background:#1e1e2a;border-left:3px solid #ff4444;">
+                <strong>📉 下方支撐（跌不下去的價位）</strong><br>
+                ${{ gex_put if gex_put else '尚無數據' }}
+                <span style="font-size:12px;color:#aaa;">（股價到這裡容易有買盤撐住）</span>
+            </div>
+            <div class="metric" style="background:#2a1e1e;border-left:3px solid #ffaa00;">
+                <strong>⚡ 多空轉折點</strong><br>
+                ${{ gex_flip if gex_flip else '尚無數據' }}
+                <span style="font-size:12px;color:#aaa;">（站上則偏多，跌破則偏空）</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 期權信號（白話版） -->
+    {% if options %}
+    <div class="card">
+        <h3>📊 期權信號</h3>
+        <div class="metric-grid">
+            {% if options.pcr %}
+            <div class="metric">
+                <strong>多空押注比 (PCR)</strong><br>
+                {{ options.pcr.pcr }}
+                <span style="font-size:12px;color:#aaa;">{{ options.pcr.text }}</span>
+            </div>
+            {% endif %}
+            {% if options.max_pain %}
+            <div class="metric">
+                <strong>莊家平衡價 (Max Pain)</strong><br>
+                ${{ options.max_pain.max_pain }}<br>
+                <span style="font-size:12px;color:#aaa;">{{ options.max_pain.signal }}</span>
+            </div>
+            {% endif %}
+            {% if options.iv %}
+            <div class="metric">
+                <strong>市場波動預期 (IV)</strong><br>
+                {{ options.iv.iv }}%<br>
+                <span style="font-size:12px;color:#aaa;">{{ options.iv.text }}</span>
+            </div>
+            {% endif %}
+            {% if options.gex %}
+            <div class="metric">
+                <strong>GEX 壓力/支撐</strong><br>
+                Call Wall: ${{ options.gex.call_wall }}<br>
+                Put Wall: ${{ options.gex.put_wall }}
+            </div>
+            {% endif %}
+        </div>
+        <div style="margin-top:15px;padding:12px;background:#0e0e12;border-radius:8px;text-align:center;">
+            <span style="font-size:18px;font-weight:bold;color:{{ options.composite.color }};">
+                {{ options.composite.text }}
+            </span>
+            <br>
+            <span style="font-size:14px;color:#ccc;">
+                {% for reason in options.composite.reasons %}
+                    • {{ reason }}<br>
+                {% endfor %}
+            </span>
+            <div style="margin-top:10px;padding:10px;background:#1a1a2e;border-radius:8px;font-size:13px;color:#aaa;">
+                💡 <strong>白話解讀：</strong>
+                {% if '偏多' in options.composite.text %}
+                    目前市場氣氛偏多，做多勝率較高。
+                {% elif '偏空' in options.composite.text %}
+                    目前市場氣氛偏空，做空或減碼觀望較安全。
+                {% else %}
+                    目前市場氣氛中性，等待方向明確再進場。
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 評分解釋 -->
+    <div class="card">
+        <h3>📖 評分解釋</h3>
+        <ul>
+            {% for r in reasons %}
+            <li>{{ r }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- 回測績效 -->
+    <div class="card">
+        <h3>📊 回測績效</h3>
+        <div class="metric-grid" id="backtest_stats">
+            <div class="metric">載入中...</div>
+        </div>
+    </div>
+
 {% endif %}
 
-<div class="card"><h3>核心指標</h3><div class="metric-grid"><div class="metric">RSI: {{ rsi }} {{ rsi_status }}</div><div class="metric">MACD: {{ macd_status }}</div><div class="metric">VWAP: {{ vwap_status }}</div><div class="metric">量比: {{ volume_ratio }}</div></div></div>
+<script>
+fetch('/backtest_stats/{{ ticker }}')
+    .then(r => r.json())
+    .then(d => {
+        if(d.error) {
+            document.getElementById('backtest_stats').innerHTML = '<div class="metric">無資料</div>';
+        } else {
+            document.getElementById('backtest_stats').innerHTML = `
+                <div class="metric">總訊號: ${d.total_signals}次</div>
+                <div class="metric">勝率: ${d.win_rate}%</div>
+                <div class="metric">平均獲利: +${d.avg_profit}%</div>
+                <div class="metric">平均虧損: ${d.avg_loss}%</div>
+                <div class="metric">Profit Factor: ${d.profit_factor}</div>
+            `;
+        }
+    })
+    .catch(err => {
+        document.getElementById('backtest_stats').innerHTML = '<div class="metric">載入失敗</div>';
+    });
+</script>
 
-<div class="card"><h3>🤖 AI預測</h3><div class="metric-grid"><div class="metric"><strong>RandomForest</strong><br>預期漲跌: {{ rf_pred if rf_pred else 'N/A' }}</div><div class="metric"><strong>XGBoost</strong><br>預期漲跌: {{ xgb_pred if xgb_pred else 'N/A' }}</div><div class="metric"><strong>LightGBM</strong><br>預期漲跌: {{ lgb_pred if lgb_pred else 'N/A' }}</div><div class="metric"><strong>綜合評分</strong><br>{% if ensemble_score %}{{ ensemble_score }}/100<br><strong>{{ ensemble_signal }}</strong>{% else %}訓練中...{% endif %}</div></div></div>📊 因子</h3><div class="metric-grid"><div class="metric">💰 籌碼: {{ smart_score }}</div><div class="metric">📈 趨勢: {{ trend_score }}</div><div class="metric">📈 成長: {{ growth_score }}</div><div class="metric">🚀 十倍股: {{ ten_bagger_score }}</div></div></div><div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;"><h3 style="margin:0;" class="tooltip-hover" title="均線趨勢與乖離率分析。紅色箭頭=均線上漲；進度條紅色=股價站上均線。">📈 均線分析</h3><div class="badge {% if ma_trend == '多頭排列' %}bull{% elif ma_trend == '空頭排列' %}bear{% else %}neutral{% endif %}" title="{% if ma_trend == '多頭排列' %}短期均線 > 中期 > 長期，技術強勢{% elif ma_trend == '空頭排列' %}長期均線壓制，技術弱勢{% else %}均線交錯，方向不明{% endif %}"><span class="pulse"></span>{% if ma_trend == '多頭排列' %}🐂 多頭排列{% elif ma_trend == '空頭排列' %}🐻 空頭排列{% else %}⚖️ 混亂{% endif %}</div></div><div class="ma-grid"><div class="metric ma-metric"><div class="ma-label">5MA</div><div class="ma-value">{{ "%.2f"|format(ma5) }}{% if ma5_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma5_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div><div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma5_ratio }}%;background-color:{% if ma5_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div><div class="ratio-text">{{ "%.1f"|format(ma5_ratio) }}%</div></div><div class="metric ma-metric"><div class="ma-label">10MA</div><div class="ma-value">{{ "%.2f"|format(ma10) }}{% if ma10_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma10_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div><div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma10_ratio }}%;background-color:{% if ma10_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div><div class="ratio-text">{{ "%.1f"|format(ma10_ratio) }}%</div></div><div class="metric ma-metric"><div class="ma-label">20MA</div><div class="ma-value">{{ "%.2f"|format(ma20) }}{% if ma20_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma20_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div><div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma20_ratio }}%;background-color:{% if ma20_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div><div class="ratio-text">{{ "%.1f"|format(ma20_ratio) }}%</div></div><div class="metric ma-metric"><div class="ma-label">60MA</div><div class="ma-value">{{ "%.2f"|format(ma60) }}{% if ma60_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma60_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div><div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma60_ratio }}%;background-color:{% if ma60_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div><div class="ratio-text">{{ "%.1f"|format(ma60_ratio) }}%</div></div><div class="metric ma-metric"><div class="ma-label">120MA</div><div class="ma-value">{{ "%.2f"|format(ma120) }}{% if ma120_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma120_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div><div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma120_ratio }}%;background-color:{% if ma120_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div><div class="ratio-text">{{ "%.1f"|format(ma120_ratio) }}%</div></div><div class="metric ma-metric"><div class="ma-label">240MA</div><div class="ma-value">{{ "%.2f"|format(ma240) }}{% if ma240_trend == 'up' %}<span class="trend-up">▲</span>{% elif ma240_trend == 'down' %}<span class="trend-down">▼</span>{% else %}<span class="trend-flat">●</span>{% endif %}</div><div class="progress-bar-container"><div class="progress-bar-fill" style="width:{{ 50+ma240_ratio }}%;background-color:{% if ma240_ratio>0 %}#ff4444{% else %}#00ff00{% endif %};"></div></div><div class="ratio-text">{{ "%.1f"|format(ma240_ratio) }}%</div></div></div></div><div class="card"><h3>壓力支撐</h3><div class="metric-grid"><div class="metric">🔴 壓力: {{ resistance }}</div><div class="metric">🟢 目標: {{ target }}</div><div class="metric">⚪ 停損: {{ stop_loss }}</div></div></div><div class="card"><h3>📌 價格警戒線 (GEX)</h3><div class="metric-grid"><div class="metric">🧱 Call Wall: {{ gex_call if gex_call else 'N/A' }}</div><div class="metric">🛡️ Put Wall: {{ gex_put if gex_put else 'N/A' }}</div><div class="metric">⚡ Gamma Flip: {{ gex_flip if gex_flip else 'N/A' }}</div></div></div>{% if options %}<div class="card"><h3>📊 期權信號</h3><div class="metric-grid">{% if options.pcr %}<div class="metric">PCR: {{ options.pcr.pcr }} {{ options.pcr.text }}</div>{% endif %}{% if options.max_pain %}<div class="metric">Max Pain: {{ options.max_pain.max_pain }}<br>{{ options.max_pain.signal }}</div>{% endif %}{% if options.iv %}<div class="metric">IV Rank: {{ options.iv.iv }}%<br>{{ options.iv.text }}</div>{% endif %}{% if options.gex %}<div class="metric">Call Wall: {{ options.gex.call_wall }}<br>Put Wall: {{ options.gex.put_wall }}<br>Gamma Flip: {{ options.gex.gamma_flip_strike }}</div>{% endif %}</div><div class="metric" style="text-align:center;"><strong style="color:{{ options.composite.color }};">{{ options.composite.text }}</strong><br>{{ options.composite.reasons|join(' ｜ ') }}</div></div>{% endif %}<div class="card"><h3>📖 評分解釋</h3><ul>{% for r in reasons %}<li>{{ r }}</li>{% endfor %}</ul></div><div class="card"><h3>📊 回測績效</h3><div class="metric-grid" id="backtest_stats"><div class="metric">載入中...</div></div></div>{% endif %}<script>fetch('/backtest_stats/{{ ticker }}').then(r=>r.json()).then(d=>{if(d.error)document.getElementById('backtest_stats').innerHTML='<div class="metric">無資料</div>';else document.getElementById('backtest_stats').innerHTML=`<div class="metric">總訊號: ${d.total_signals}次</div><div class="metric">勝率: ${d.win_rate}%</div><div class="metric">平均獲利: +${d.avg_profit}%</div><div class="metric">平均虧損: ${d.avg_loss}%</div><div class="metric">Profit Factor: ${d.profit_factor}</div>`;})</script></body></html>
+</body>
+</html>
