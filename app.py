@@ -1966,6 +1966,151 @@ def generate_tactical_advice(current_price, call_wall, put_wall, gamma_flip, ma_
     if not advice: return "⚖️ 區間震盪"
     return " | ".join(advice)
 
+def generate_trading_suggestion(ticker, market, current_price, gex_data, delta_analysis, pcr, ma_trend):
+    """
+    自動產生白話交易建議
+    綜合 GEX、Delta、PCR、均線趨勢，給出具體操作建議
+    """
+    if market != 'us':
+        return "台股請參考三大法人與技術指標"
+    
+    if current_price is None:
+        return "無法取得股價，請稍後再試"
+    
+    # 提取數據
+    gex_call = gex_data.get('call_wall') if gex_data else None
+    gex_put = gex_data.get('put_wall') if gex_data else None
+    gex_flip = gex_data.get('gamma_flip_strike') if gex_data else None
+    gex_net = gex_data.get('net_total_gex', 0) if gex_data else 0
+    
+    # 分析 Delta 狀況
+    high_delta_count = 0
+    low_delta_count = 0
+    max_delta = 0
+    delta_strikes = []
+    if delta_analysis:
+        for item in delta_analysis:
+            delta_val = item.get('delta', 0)
+            strike = item.get('strike', 0)
+            if delta_val >= 0.6:
+                high_delta_count += 1
+                delta_strikes.append(f"${strike} (Delta={delta_val:.2f})")
+            elif delta_val <= 0.3:
+                low_delta_count += 1
+            if delta_val > max_delta:
+                max_delta = delta_val
+    
+    # 評估市場狀態
+    is_bullish = False
+    is_bearish = False
+    reasons = []
+    suggestion = ""
+    confidence = "中"
+    
+    # 1. GEX 判斷
+    if gex_net < 0:
+        reasons.append("GEX 為負值，市場處於失控區，容易暴漲暴跌")
+    else:
+        reasons.append("GEX 為正值，市場處於震盪區，區間操作")
+    
+    # 2. 均線趨勢
+    if ma_trend == "多頭排列":
+        is_bullish = True
+        reasons.append("均線多頭排列，中期趨勢偏多")
+    elif ma_trend == "空頭排列":
+        is_bearish = True
+        reasons.append("均線空頭排列，中期趨勢偏空")
+    
+    # 3. Delta 分析
+    if high_delta_count >= 2:
+        reasons.append(f"多個高 Delta 期權爆量（{', '.join(delta_strikes[:2])}），大戶積極看多")
+        is_bullish = True
+    elif low_delta_count >= 2:
+        reasons.append("多個低 Delta 期權爆量，大戶押注暴漲行情（彩票性質）")
+    
+    # 4. PCR 判斷（如果有的話）
+    if pcr is not None:
+        if pcr < 0.7:
+            reasons.append(f"PCR={pcr:.2f}，低於 0.7，市場偏多")
+            is_bullish = True
+        elif pcr > 1.3:
+            reasons.append(f"PCR={pcr:.2f}，高於 1.3，市場偏空")
+            is_bearish = True
+        else:
+            reasons.append(f"PCR={pcr:.2f}，中性")
+    
+    # 5. Call Wall / Put Wall 判斷
+    if gex_call and current_price < gex_call * 0.95:
+        reasons.append(f"目前股價低於 Call Wall ${gex_call}，仍有上漲空間")
+        if not is_bearish:
+            is_bullish = True
+    elif gex_call and current_price > gex_call * 1.05:
+        reasons.append(f"目前股價已接近 Call Wall ${gex_call}，上方壓力較大")
+        is_bearish = True
+    
+    if gex_put and current_price > gex_put * 1.05:
+        reasons.append(f"目前股價高於 Put Wall ${gex_put}，下方有支撐")
+        if not is_bearish:
+            is_bullish = True
+    elif gex_put and current_price < gex_put * 0.95:
+        reasons.append(f"已跌破 Put Wall ${gex_put}，下方支撐破，小心續跌")
+        is_bearish = True
+    
+    # 6. Gamma Flip 判斷
+    if gex_flip:
+        if current_price > gex_flip:
+            reasons.append(f"站上 Gamma Flip ${gex_flip}，做市商轉為撐盤")
+            if not is_bearish:
+                is_bullish = True
+        else:
+            reasons.append(f"低於 Gamma Flip ${gex_flip}，做市商可能追殺")
+            is_bearish = True
+    
+    # 產生最終建議
+    if is_bullish and not is_bearish:
+        suggestion = "📈 建議：偏多操作"
+        confidence = "高"
+        if gex_net < 0:
+            suggestion += "，目前為失控盤，可積極做多，停損設於 Put Wall 下方"
+        else:
+            suggestion += "，震盪盤，建議逢低分批布局"
+        if gex_call:
+            suggestion += f"，目標價參考 Call Wall ${gex_call}"
+        if gex_put:
+            suggestion += f"，停損參考 ${gex_put}"
+    elif is_bearish and not is_bullish:
+        suggestion = "📉 建議：偏空操作或減碼觀望"
+        confidence = "高"
+        if gex_net < 0:
+            suggestion += "，失控盤，可考慮做空或買 Put"
+        else:
+            suggestion += "，震盪盤，建議反彈減碼"
+        if gex_put:
+            suggestion += f"，支撐參考 ${gex_put}，跌破則加速下跌"
+    elif is_bullish and is_bearish:
+        suggestion = "⚖️ 建議：區間震盪，耐心等待方向"
+        confidence = "中"
+        if gex_put and gex_call:
+            suggestion += f"，區間參考 ${gex_put} ~ ${gex_call}"
+    else:
+        suggestion = "⚖️ 建議：訊號混亂，建議觀望"
+        confidence = "低"
+    
+    # 加入風險提醒
+    if gex_net < 0 and confidence == "高":
+        suggestion += " ⚠️ GEX 為負，波動可能加大，請嚴格控管風險"
+    
+    return {
+        'suggestion': suggestion,
+        'confidence': confidence,
+        'reasons': reasons,
+        'is_bullish': is_bullish,
+        'is_bearish': is_bearish,
+        'high_delta_count': high_delta_count,
+        'low_delta_count': low_delta_count,
+        'max_delta': max_delta
+    }
+
 
 def calculate_option_delta(ticker, expiration_date, strike, option_type='call'):
     try:
@@ -2764,17 +2909,19 @@ def indicators_page(ticker):
         ai_signal = ensemble[1] if ensemble[1] else None
         tactical_advice = generate_tactical_advice(curr, gex_call, gex_put, gex_flip, ma_trend, vwap_status, ai_signal,
                                                    unusual_opt[:2] if unusual_opt else None)
+        # 自動戰術建議（綜合 GEX、Delta、PCR、均線）
+        trading_suggestion = generate_trading_suggestion(
+            ticker, market, curr, gex_data, delta_analysis, pcr, ma_trend
+        )
         
-        # 分析異常期權的 Delta 值（暫時停用以節省記憶體）
+               # 分析異常期權的 Delta 值（僅美股且有異常期權時計算）
         delta_analysis = []
-        # if market == 'us' and unusual_opt:
-        #     try:
-        #         delta_analysis = analyze_unusual_options(ticker, unusual_opt)
-        #     except Exception as e:
-        #         logger.error(f"Delta 分析失敗: {e}")
-        #         delta_analysis = []
-        # else:
-        #     delta_analysis = []
+        if market == 'us' and unusual_opt:
+            try:
+                delta_analysis = analyze_unusual_options(ticker, unusual_opt)
+            except Exception as e:
+                logger.error(f"Delta 分析失敗: {e}")
+                delta_analysis = []
 
         # 取得三大法人資料（用於顯示）
         foreign, trust, dealer, inst_date = get_institutional_data(ticker)
@@ -2807,11 +2954,8 @@ def indicators_page(ticker):
                                ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
                                ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
                                gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                               unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score)
-    except Exception as e:
-        logger.error(f"indicators_page 錯誤: {e}", exc_info=True)
-        return f"<h1>錯誤</h1><pre>{e}</pre>", 500
-
+                               unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
+                               pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion)
 @app.route('/bonding')
 def bonding_page():
     threshold = settings.get('bonding_threshold',3.0)/100
