@@ -2197,7 +2197,8 @@ def analyze_unusual_options(ticker, unusual_options):
         return analysis
     except Exception as e:
         print(f"analyze_unusual_options 整體錯誤: {e}")
-        return [{"summary": f"分析過程中發生錯誤: {str(e)}"}]def get_unusual_options(ticker):
+        return [{"summary": f"分析過程中發生錯誤: {str(e)}"}]
+def get_unusual_options(ticker):
     try:
         tk = yf.Ticker(ticker)
         exps = tk.options
