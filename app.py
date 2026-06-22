@@ -2691,7 +2691,7 @@ def indicators_page(ticker):
                 X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
                 X_scaled = rf_scaler.transform(X_pred)
                 rf_pred_val = rf_model.predict(X_scaled)[0] * 100
-         if XGB_AVAILABLE:
+        if XGB_AVAILABLE:
             xgb_model, xgb_scaler = get_xgb_model(ticker)
             if xgb_model and xgb_scaler:
                 feats = calculate_features(df)
@@ -2699,6 +2699,7 @@ def indicators_page(ticker):
                     X_pred = np.array(get_feature_vector(feats)).reshape(1, -1)
                     X_scaled = xgb_scaler.transform(X_pred)
                     xgb_pred_val = xgb_model.predict(X_scaled)[0] * 100
+
         if LGB_AVAILABLE:
             lgb_model, lgb_scaler = get_lgb_model(ticker)
             if lgb_model and lgb_scaler:
