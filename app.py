@@ -889,14 +889,11 @@ def get_tw_stock_data(ticker):
         change = curr-prev; pct = change/prev*100 if prev!=0 else 0
         return curr, change, pct, df_hist
 def get_all_tickers(market):
-    file_path = STOCK_FILE_TW if market=='tw' else STOCK_FILE_US
-    tickers = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            t = line.strip().upper()
-            if t:
-                if market == 'tw' and not t.endswith('.TW'): t = t + '.TW'
-                tickers.append(t)
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT ticker FROM user_watchlist WHERE market = %s", (market,))
+        rows = cur.fetchall()
+        tickers = [row[0] for row in rows]
     return tickers
 def compute_stock_summary(ticker, market):
     try:
@@ -1569,24 +1566,31 @@ def calculate_institutional_score(foreign, trust, dealer):
 
 # ================== 持倉函數 ==================
 def load_positions():
-    if os.path.exists(POSITIONS_FILE):
-        with open(POSITIONS_FILE, 'r', encoding='utf-8') as f: return json.load(f)
-    return []
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT ticker, cost, shares FROM user_positions")
+        rows = cur.fetchall()
+        return [{"ticker": r[0], "cost": float(r[1]), "shares": int(r[2])} for r in rows]
 def save_positions(positions):
-    with open(POSITIONS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(positions, f, indent=2, ensure_ascii=False)
-
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM user_positions")
+        for p in positions:
+            cur.execute("INSERT INTO user_positions (ticker, cost, shares) VALUES (%s, %s, %s)", (p['ticker'], p['cost'], p['shares']))
+        conn.commit()
 def add_multiple_stocks(tickers_str, market):
     tickers = re.split(r'[,\s\n]+', tickers_str.strip().upper())
     tickers = [t for t in tickers if t]
     if market == 'tw':
         tickers = [t if t.endswith('.TW') else t + '.TW' for t in tickers]
-    file_path = STOCK_FILE_TW if market=='tw' else STOCK_FILE_US
-    with open(file_path, 'r', encoding='utf-8') as f:
-        existing = [l.strip().upper() for l in f if l.strip()]
+    existing = set(get_all_tickers(market))
     new_tickers = [t for t in tickers if t not in existing]
-    with open(file_path, 'a', encoding='utf-8') as f:
-        for t in new_tickers: f.write(f"{t}\n")
+    if new_tickers:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            for t in new_tickers:
+                cur.execute("INSERT INTO user_watchlist (ticker, market) VALUES (%s, %s)", (t, market))
+            conn.commit()
     return len(new_tickers), new_tickers
 
 # ================== 研究連結函數 ==================
@@ -1955,16 +1959,24 @@ def add_stock_us():
 def add_position():
     try:
         ticker = request.form.get("pos_ticker","").strip().upper()
-        cost = float(request.form.get("cost",0)); shares = int(request.form.get("shares",0))
-        if not ticker or cost<=0 or shares<=0: return "❌ 請填寫完整資訊",400
+        cost = float(request.form.get("cost",0))
+        shares = int(request.form.get("shares",0))
+        if not ticker or cost<=0 or shares<=0:
+            return "❌ 請填寫完整資訊",400
         pos = load_positions()
-        found=False
+        found = False
         for p in pos:
-            if p['ticker']==ticker: p['cost'],p['shares']=cost,shares; found=True; break
-        if not found: pos.append({"ticker":ticker,"cost":cost,"shares":shares})
+            if p['ticker'] == ticker:
+                p['cost'] = cost
+                p['shares'] = shares
+                found = True
+                break
+        if not found:
+            pos.append({"ticker": ticker, "cost": cost, "shares": shares})
         save_positions(pos)
         return redirect(url_for('positions_page'))
-    except: return "❌ 輸入錯誤",400
+    except Exception as e:
+        return f"❌ 輸入錯誤: {e}", 400
 @app.route("/add_batch_us", methods=["POST"])
 def add_batch_us():
     default_tickers = ["AAPL", "MSFT", "GOOGL", "NVDA", "TSLA", "META", "AMD", "INTC", "QCOM", "AMZN"]
@@ -1990,17 +2002,17 @@ def clear_position(ticker):
     return redirect(url_for('positions_page'))
 @app.route("/delete/tw/<ticker>")
 def delete_tw(ticker):
-    with open(STOCK_FILE_TW,'r', encoding='utf-8') as f: lines = f.readlines()
-    with open(STOCK_FILE_TW,'w', encoding='utf-8') as f:
-        for line in lines:
-            if line.strip().upper() != ticker.upper(): f.write(line)
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM user_watchlist WHERE ticker = %s AND market = 'tw'", (ticker.upper(),))
+        conn.commit()
     return redirect(url_for('tw_page'))
 @app.route("/delete/us/<ticker>")
 def delete_us(ticker):
-    with open(STOCK_FILE_US,'r', encoding='utf-8') as f: lines = f.readlines()
-    with open(STOCK_FILE_US,'w', encoding='utf-8') as f:
-        for line in lines:
-            if line.strip().upper() != ticker.upper(): f.write(line)
+    with get_db_connection() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM user_watchlist WHERE ticker = %s AND market = 'us'", (ticker.upper(),))
+        conn.commit()
     return redirect(url_for('us_page'))
 @app.route("/retrain_all")
 def retrain_all_models():
@@ -2618,8 +2630,38 @@ def institutional_view():
             rows = cur.fetchall()
     return render_template('institutional.html', data=rows)
 
+# ================== 初始化自選股與持倉資料表 ==================
+def init_user_tables():
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_watchlist (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT NOT NULL,
+                    market TEXT NOT NULL CHECK (market IN ('tw', 'us')),
+                    UNIQUE(ticker, market)
+                )
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_positions (
+                    id SERIAL PRIMARY KEY,
+                    ticker TEXT NOT NULL,
+                    cost NUMERIC NOT NULL,
+                    shares INTEGER NOT NULL,
+                    UNIQUE(ticker)
+                )
+            """)
+            conn.commit()
+            logger.info("自選股與持倉資料表初始化完成")
+    except Exception as e:
+        logger.error(f"初始化使用者表格失敗: {e}")
+
+init_user_tables()
+
 # ================== 主程式 ==================
 if __name__ == "__main__":
+    init_user_tables()  # 確保表格存在
     debug_mode = os.getenv("FLASK_DEBUG", "false").lower() == "true"
     print("🚀 啟動 AI 量化監控中心 v16_final")
     print(f"📊 訪問地址：0.0.0.0:{os.environ.get('PORT', 5000)}  (debug={debug_mode})")
