@@ -96,20 +96,7 @@
     <!-- Delta 分析區塊（如果存在異常期權） -->
     {% if delta_analysis %}
     <div class="card">
-        <h3>📐 異常期權 Delta 分析</h3>
-        <ul>
-            {% for item in delta_analysis %}
-            <li>{{ item.summary }}</li>
-            {% endfor %}
-        </ul>
-        <p style="font-size:13px; color:#aaa;">💡 Delta 值介於 0~1 之間，數值越大代表該履約價的 Call 期權對股價上漲越敏感。</p>
-        <p style="font-size:13px; color:#aaa;">📌 價內 Call 的 Delta 接近 1，價外 Call 的 Delta 接近 0。</p>
-    </div>
-    {% endif %}
-
-    <!-- Delta 分析 -->
-    {% if delta_analysis %}
-    <div class="card">
+        
         <h3>📐 異常期權 Delta 分析</h3>
         <ul>
             {% for item in delta_analysis %}
