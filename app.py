@@ -3699,33 +3699,72 @@ def indicators_page(ticker):
             inst_display = "無資料"
             inst_score = 50
 
-            return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
-                                   pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
-                                   macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
-                                   ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
-                                   ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
-                                   volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
-                                   resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
-                                   rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
-                                   xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
-                                   lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
-                                   ensemble_score=ensemble[0] if ensemble[0] else None,
-                                   ensemble_signal=ensemble[1] if ensemble[1] else None,
-                                   ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
-                                   smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
-                                   trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
-                                   ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
-                                   options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
-                                   ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
-                                   ma120_trend=ma120_trend, ma240_trend=ma240_trend,
-                                   ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
-                                   ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
-                                   gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                                   unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
-                                   pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion,
-                                   bb_status=bb_status, bb_position_pct=bb_position_pct, bb_signal=bb_signal,
-                                   kd_status=kd_status, kd_signal=kd_signal,
-                                   macd_divergence=macd_divergence)
+        # 融資融券與借券賣出（台股）
+        margin_data = "無資料"
+        margin_score = 50
+        if market == 'tw':
+            margin, short, short_sell, ms_date = get_margin_short_data(ticker)
+            if margin is not None:
+                margin_data = f"融資:{margin:,} 融券:{short:,} 借券賣出:{short_sell:,} (日期:{ms_date})"
+                margin_score = get_margin_short_score(
+                    margin, short, short_sell, curr)
+            else:
+                margin_data = "無資料（非交易日或尚未更新）"
+                margin_score = 50
+
+        # 布林通道
+        bb_upper, bb_mid, bb_lower, bb_position, bb_width = calculate_bollinger_bands(
+            close_series)
+        if bb_upper is not None:
+            bb_status = f"上軌: {bb_upper:.2f} | 中軌: {bb_mid:.2f} | 下軌: {bb_lower:.2f}"
+            bb_position_pct = round(bb_position * 100, 1)
+            bb_signal = "🔴 超買" if bb_position > 0.8 else "🟢 超賣" if bb_position < 0.2 else "⚪ 中性"
+        else:
+            bb_status = "無數據"
+            bb_position_pct = 50
+            bb_signal = "⚪ 中性"
+
+        # KD 指標
+        k_val, d_val = calculate_kd(df['High'], df['Low'], df['Close'])
+        kd_signal = "🔴 超買" if k_val > 80 else "🟢 超賣" if k_val < 20 else "⚪ 中性"
+        kd_status = f"K={k_val:.1f}, D={d_val:.1f}"
+
+        # MACD 背離
+        macd_divergence = get_macd_divergence_status(ticker, df)
+        if macd_divergence is None:
+            macd_divergence = "計算中..."
+
+        return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
+                               pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
+                               macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
+                               ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
+                               ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
+                               volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
+                               resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
+                               rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
+                               xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
+                               lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
+                               ensemble_score=ensemble[0] if ensemble[0] else None,
+                               ensemble_signal=ensemble[1] if ensemble[1] else None,
+                               ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
+                               smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
+                               trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
+                               ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
+                               options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
+                               ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
+                               ma120_trend=ma120_trend, ma240_trend=ma240_trend,
+                               ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
+                               ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
+                               gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
+                               unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
+                               pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion,
+                               bb_status=bb_status, bb_position_pct=bb_position_pct, bb_signal=bb_signal,
+                               kd_status=kd_status, kd_signal=kd_signal,
+                               macd_divergence=macd_divergence,
+                               margin_data=margin_data, margin_score=margin_score)
+    except Exception as e:
+        logger.error(f"indicators_page 錯誤: {e}", exc_info=True)
+        return f"<h1>錯誤</h1><pre>{e}</pre>", 500
 
 
 @app.route('/bonding')
