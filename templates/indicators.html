@@ -199,6 +199,21 @@
         </div>
     </div>
 
+    <!-- 融資融券與借券賣出（僅台股） -->
+    {% if market == 'tw' %}
+    <div class="card">
+        <h3>🧾 融資融券與借券賣出</h3>
+        <div class="metric-grid">
+            <div class="metric">{{ margin_data }}</div>
+            <div class="metric">散戶/法人分數: {{ margin_score }}/100</div>
+        </div>
+        <div style="font-size:12px; color:#aaa; margin-top:5px;">
+            💡 融資餘額高＝散戶過熱（偏空訊號），融券餘額高＝軋空潛力，借券賣出高＝法人避險（偏空）
+        </div>
+    </div>
+    {% endif %}
+
+
     <!-- 價格警戒線 (GEX) 白話版 -->
     <div class="card">
         <h3>📌 價格警戒線 (GEX)</h3>
