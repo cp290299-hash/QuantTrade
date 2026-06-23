@@ -2092,10 +2092,9 @@ def get_margin_short_score(margin, short, short_sell, current_price=None):
 
 # ================== 三大法人與主力籌碼數據整合 ==================
 
-
 def extract_stock_number(ticker):
+    """從 '2330.TW' 提取 '2330'"""
     return ticker.replace('.TW', '')
-
 
 def init_institutional_db():
     """初始化三大法人資料庫，支援 SQLite 和 PostgreSQL"""
@@ -2123,6 +2122,18 @@ def init_institutional_db():
                     UNIQUE(stock_id, date)
                 )
             """)
+            # 新增融資融券表格
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS margin_short (
+                    id SERIAL PRIMARY KEY,
+                    stock_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    margin_balance INTEGER,
+                    short_balance INTEGER,
+                    short_sell_balance INTEGER,
+                    UNIQUE(stock_id, date)
+                )
+            """)
         else:
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS institutional_ownership (
@@ -2143,9 +2154,18 @@ def init_institutional_db():
                     PRIMARY KEY (stock_id, date)
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS margin_short (
+                    stock_id TEXT,
+                    date TEXT,
+                    margin_balance INTEGER,
+                    short_balance INTEGER,
+                    short_sell_balance INTEGER,
+                    PRIMARY KEY (stock_id, date)
+                )
+            """)
         conn.commit()
     logger.info("三大法人資料庫初始化完成")
-
 
 def fetch_institutional_holders(ticker, date=None):
     import requests
@@ -2156,8 +2176,7 @@ def fetch_institutional_holders(ticker, date=None):
     else:
         date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
     for i in range(5):
-        check_date = (datetime.strptime(date, '%Y%m%d') -
-                      timedelta(days=i)).strftime('%Y%m%d')
+        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
         url = f"https://www.twse.com.tw/fund/T86?response=json&date={check_date}&selectType=ALLBUT0999"
         try:
             resp = requests.get(url, timeout=10)
@@ -2166,61 +2185,17 @@ def fetch_institutional_holders(ticker, date=None):
                 if data.get('stat') == 'OK' and 'data' in data:
                     for row in data['data']:
                         if len(row) >= 6 and row[0].strip() == stock_id:
-                            foreign = int(row[3].replace(
-                                ',', '')) if row[3] else 0
-                            trust = int(row[4].replace(
-                                ',', '')) if row[4] else 0
-                            dealer = int(row[5].replace(
-                                ',', '')) if row[5] else 0
-                            logger.info(
-                                f"成功抓取 {ticker} 在 {check_date} 的三大法人資料")
+                            foreign = int(row[3].replace(',', '')) if row[3] else 0
+                            trust = int(row[4].replace(',', '')) if row[4] else 0
+                            dealer = int(row[5].replace(',', '')) if row[5] else 0
+                            logger.info(f"成功抓取 {ticker} 在 {check_date} 的三大法人資料")
                             return foreign, trust, dealer, check_date
-                    continue
-                else:
                     continue
         except Exception as e:
             logger.error(f"抓取 {ticker} 在 {check_date} 失敗: {e}")
             continue
     logger.warning(f"{ticker} 連續5天都找不到三大法人資料")
     return None, None, None, None
-
-
-def fetch_large_shareholders(ticker):
-    import requests
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    stock_id = extract_stock_number(ticker)
-    url = f"https://opendata.tdcc.com.tw/api/opendata/{stock_id}"
-    try:
-        resp = requests.get(url, timeout=10, verify=False,
-                            allow_redirects=False)
-        if resp.status_code in (301, 302):
-            new_url = resp.headers.get('Location')
-            if new_url:
-                resp = requests.get(new_url, timeout=10, verify=False)
-        if resp.status_code == 200:
-            data = resp.json()
-            if data and 'data' in data and data['data']:
-                total_shares = None
-                large_shares = 0
-                for item in data['data']:
-                    range_str = item.get('持股分級', '')
-                    shares_str = item.get('股數', '0')
-                    try:
-                        shares = int(shares_str.replace(',', ''))
-                    except:
-                        shares = 0
-                    if range_str == "合計":
-                        total_shares = shares
-                    elif any(level in range_str for level in ["1,000", "5,000", "10,000", "50,000", "100,000"]):
-                        large_shares += shares
-                if total_shares and total_shares > 0:
-                    ratio = large_shares / total_shares * 100
-                    return ratio
-    except Exception as e:
-        logger.error(f"抓取 {ticker} 千張大戶資料失敗: {e}")
-    return None
-
 
 def update_institutional_data(ticker):
     foreign, trust, dealer, data_date = fetch_institutional_holders(ticker)
@@ -2230,132 +2205,205 @@ def update_institutional_data(ticker):
     with closing(get_db_connection()) as conn:
         cur = conn.cursor()
         if DATABASE_URL:
-            cur.execute('''
+            cur.execute("""
                 INSERT INTO institutional_ownership (stock_id, date, foreign_investors, investment_trust, dealers)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (stock_id, date) DO UPDATE SET
                     foreign_investors = EXCLUDED.foreign_investors,
                     investment_trust = EXCLUDED.investment_trust,
                     dealers = EXCLUDED.dealers
-            ''', (ticker, data_date, foreign, trust, dealer))
+            """, (ticker, data_date, foreign, trust, dealer))
         else:
-            cur.execute('''
+            cur.execute("""
                 INSERT OR REPLACE INTO institutional_ownership (stock_id, date, foreign_investors, investment_trust, dealers)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (ticker, data_date, foreign, trust, dealer))
+            """, (ticker, data_date, foreign, trust, dealer))
         conn.commit()
-    logger.info(
-        f"更新 {ticker} ({data_date}) 三大法人: 外資={foreign}, 投信={trust}, 自營={dealer}")
-
-
-def update_large_shareholders_data(ticker):
-    return  # 暫時停用
-    if ratio is None:
-        logger.warning(f"{ticker} 無千張大戶資料，跳過更新")
-        return
-    today = datetime.now().strftime('%Y%m%d')
-    with closing(get_db_connection()) as conn:
-        cur = conn.cursor()
-        if DATABASE_URL:
-            cur.execute('''
-                INSERT INTO large_shareholders (stock_id, date, holding_ratio, shareholders_count)
-                VALUES (%s, %s, %s, %s)
-                ON CONFLICT (stock_id, date) DO UPDATE SET
-                    holding_ratio = EXCLUDED.holding_ratio,
-                    shareholders_count = EXCLUDED.shareholders_count
-            ''', (ticker, today, ratio, 0))
-        else:
-            cur.execute('''
-                INSERT OR REPLACE INTO large_shareholders (stock_id, date, holding_ratio, shareholders_count)
-                VALUES (?, ?, ?, ?)
-            ''', (ticker, today, ratio, 0))
-        conn.commit()
-    logger.info(f"更新 {ticker} 千張大戶持股比率: {ratio:.2f}%")
-
-        # 取得融資融券與借券賣出數據（台股）
-        margin_score = None
-        margin_data = None
-        if market == 'tw':
-            margin, short, short_sell, ms_date = get_margin_short_data(ticker)
-            if margin is not None:
-                margin_data = f"融資:{margin:,} 融券:{short:,} 借券賣出:{short_sell:,} (日期:{ms_date})"
-                margin_score = get_margin_short_score(margin, short, short_sell, curr)
-            else:
-                margin_data = "無資料"
-                margin_score = 50
-        else:
-            margin_data = "美股無融資數據"
-            margin_score = 50
-
+    logger.info(f"更新 {ticker} ({data_date}) 三大法人: 外資={foreign}, 投信={trust}, 自營={dealer}")
 
 def get_institutional_data(ticker, date=None):
     with closing(get_db_connection()) as conn:
         cur = conn.cursor()
         if DATABASE_URL:
             if date is None:
-                cur.execute('''
+                cur.execute("""
                     SELECT foreign_investors, investment_trust, dealers, date
                     FROM institutional_ownership
                     WHERE stock_id = %s
                     ORDER BY date DESC LIMIT 1
-                ''', (ticker,))
+                """, (ticker,))
             else:
-                cur.execute('''
+                cur.execute("""
                     SELECT foreign_investors, investment_trust, dealers, date
                     FROM institutional_ownership
                     WHERE stock_id = %s AND date = %s
-                ''', (ticker, date))
+                """, (ticker, date))
         else:
             if date is None:
-                cur.execute('''
+                cur.execute("""
                     SELECT foreign_investors, investment_trust, dealers, date
                     FROM institutional_ownership
                     WHERE stock_id = ?
                     ORDER BY date DESC LIMIT 1
-                ''', (ticker,))
+                """, (ticker,))
             else:
-                cur.execute('''
+                cur.execute("""
                     SELECT foreign_investors, investment_trust, dealers, date
                     FROM institutional_ownership
                     WHERE stock_id = ? AND date = ?
-                ''', (ticker, date))
+                """, (ticker, date))
         row = cur.fetchone()
         if row:
             return row[0], row[1], row[2], row[3]
     return None, None, None, None
 
-
 def calculate_institutional_score(foreign, trust, dealer):
     score = 50
     if foreign is not None:
-        foreign_abs = abs(foreign)
         if foreign > 0:
-            foreign_score = min(16.67, foreign_abs / 1_000_000)
+            score += min(16.67, abs(foreign) / 1_000_000)
         elif foreign < 0:
-            foreign_score = -min(16.67, foreign_abs / 1_000_000)
-        else:
-            foreign_score = 0
-        score += foreign_score
+            score -= min(16.67, abs(foreign) / 1_000_000)
     if trust is not None:
-        trust_abs = abs(trust)
         if trust > 0:
-            trust_score = min(16.67, trust_abs / 1_000_000)
+            score += min(16.67, abs(trust) / 1_000_000)
         elif trust < 0:
-            trust_score = -min(16.67, trust_abs / 1_000_000)
-        else:
-            trust_score = 0
-        score += trust_score
+            score -= min(16.67, abs(trust) / 1_000_000)
     if dealer is not None:
-        dealer_abs = abs(dealer)
         if dealer > 0:
-            dealer_score = min(16.67, dealer_abs / 1_000_000)
+            score += min(16.67, abs(dealer) / 1_000_000)
         elif dealer < 0:
-            dealer_score = -min(16.67, dealer_abs / 1_000_000)
-        else:
-            dealer_score = 0
-        score += dealer_score
+            score -= min(16.67, abs(dealer) / 1_000_000)
     return max(0, min(100, score))
 
+# ================== 融資融券與借券賣出 ==================
+
+def fetch_margin_short(ticker, date=None):
+    """從證交所抓取個股融資融券與借券賣出餘額"""
+    import requests
+    from datetime import datetime, timedelta
+
+    stock_id = extract_stock_number(ticker)
+    if date is None:
+        date = datetime.now().strftime('%Y%m%d')
+    else:
+        date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
+
+    for i in range(5):
+        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
+        url = f"https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date={check_date}&stockId={stock_id}"
+        try:
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('stat') == 'OK' and 'data' in data and data['data']:
+                    row = data['data'][0]
+                    margin = int(row[5].replace(',', '')) if len(row) > 5 and row[5] else 0
+                    short = int(row[10].replace(',', '')) if len(row) > 10 and row[10] else 0
+                    # 借券賣出（使用 MI_GS API）
+                    short_sell = 0
+                    try:
+                        url2 = f"https://www.twse.com.tw/exchangeReport/MI_GS?response=json&date={check_date}&stockId={stock_id}"
+                        resp2 = requests.get(url2, timeout=10)
+                        if resp2.status_code == 200:
+                            data2 = resp2.json()
+                            if data2.get('stat') == 'OK' and 'data' in data2 and data2['data']:
+                                row2 = data2['data'][0]
+                                short_sell = int(row2[3].replace(',', '')) if len(row2) > 3 and row2[3] else 0
+                    except:
+                        pass
+                    logger.info(f"成功抓取 {ticker} 在 {check_date} 的融資融券資料")
+                    return margin, short, short_sell, check_date
+        except Exception as e:
+            logger.error(f"抓取 {ticker} 在 {check_date} 的融資融券失敗: {e}")
+            continue
+
+    logger.warning(f"{ticker} 連續5天找不到融資融券資料")
+    return None, None, None, None
+
+def update_margin_short_data(ticker):
+    """更新單一股票的融資融券與借券賣出數據"""
+    margin, short, short_sell, data_date = fetch_margin_short(ticker)
+    if margin is None:
+        logger.warning(f"{ticker} 無融資融券資料，跳過更新")
+        return
+    with closing(get_db_connection()) as conn:
+        cur = conn.cursor()
+        if DATABASE_URL:
+            cur.execute("""
+                INSERT INTO margin_short (stock_id, date, margin_balance, short_balance, short_sell_balance)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (stock_id, date) DO UPDATE SET
+                    margin_balance = EXCLUDED.margin_balance,
+                    short_balance = EXCLUDED.short_balance,
+                    short_sell_balance = EXCLUDED.short_sell_balance
+            """, (ticker, data_date, margin, short, short_sell))
+        else:
+            cur.execute("""
+                INSERT OR REPLACE INTO margin_short (stock_id, date, margin_balance, short_balance, short_sell_balance)
+                VALUES (?, ?, ?, ?, ?)
+            """, (ticker, data_date, margin, short, short_sell))
+        conn.commit()
+    logger.info(f"更新 {ticker} ({data_date}) 融資={margin}, 融券={short}, 借券賣出={short_sell}")
+
+def get_margin_short_data(ticker, date=None):
+    """取得最新融資融券與借券賣出數據"""
+    with closing(get_db_connection()) as conn:
+        cur = conn.cursor()
+        if DATABASE_URL:
+            if date is None:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = %s
+                    ORDER BY date DESC LIMIT 1
+                """, (ticker,))
+            else:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = %s AND date = %s
+                """, (ticker, date))
+        else:
+            if date is None:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = ?
+                    ORDER BY date DESC LIMIT 1
+                """, (ticker,))
+            else:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = ? AND date = ?
+                """, (ticker, date))
+        row = cur.fetchone()
+        if row:
+            return row[0], row[1], row[2], row[3]
+    return None, None, None, None
+
+def get_margin_short_score(margin, short, short_sell, current_price=None):
+    """將融資融券數據轉換為分數（0~100）"""
+    score = 50
+    if margin is not None:
+        if margin > 50000:
+            score -= 20
+        elif margin > 20000:
+            score -= 10
+        else:
+            score += 10
+    if short is not None:
+        if short > 10000:
+            score += 15
+        elif short > 5000:
+            score += 5
+    if short_sell is not None:
+        if short_sell > 30000:
+            score -= 25
+        elif short_sell > 10000:
+            score -= 10
+    return max(0, min(100, score))
 # ================== 持倉函數 ==================
 
 
@@ -3911,6 +3959,8 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=debug_mode, threaded=True)
+
+    
 
     # 每日更新融資融券與借券賣出（交易日 17:30）
     scheduler.add_job(
