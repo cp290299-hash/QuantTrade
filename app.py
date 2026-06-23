@@ -317,6 +317,105 @@ def get_tw_stock_realtime_shioaji(ticker, max_retries=3):
 # ================== 技術指標函數 ==================
 
 
+# ================== 進階技術指標（布林通道、KD、MACD背離） ==================
+
+def calculate_bollinger_bands(close, period=20, std_dev=2):
+    """
+    計算布林通道
+    回傳 (上軌, 中軌, 下軌, 頻寬百分比, 價格位置)
+    """
+    if len(close) < period:
+        return None, None, None, None, None
+    ma = close.rolling(period).mean().iloc[-1]
+    std = close.rolling(period).std().iloc[-1]
+    upper = ma + std_dev * std
+    lower = ma - std_dev * std
+    current_price = close.iloc[-1]
+    # 頻寬百分比：價格在通道中的位置 (0=下軌, 0.5=中軌, 1=上軌)
+    if upper == lower:
+        bandwidth_pct = 0.5
+    else:
+        bandwidth_pct = (current_price - lower) / (upper - lower)
+    return upper, ma, lower, bandwidth_pct, (upper - lower) / ma
+
+def calculate_kd(high, low, close, period=9, smooth_k=3, smooth_d=3):
+    """
+    計算 KD 指標
+    回傳 (K值, D值)
+    """
+    if len(close) < period:
+        return 50, 50
+    # RSV
+    low_min = low.rolling(period).min()
+    high_max = high.rolling(period).max()
+    rsv = (close - low_min) / (high_max - low_min) * 100
+    rsv = rsv.fillna(50)
+    # K = 平滑 RSV, D = 平滑 K
+    k = rsv.ewm(span=smooth_k, adjust=False).mean()
+    d = k.ewm(span=smooth_d, adjust=False).mean()
+    return k.iloc[-1], d.iloc[-1]
+
+def detect_macd_divergence(close, macd_line, signal_line):
+    """
+    偵測 MACD 背離
+    回傳 (類型: 'bullish' 底背離 / 'bearish' 頂背離 / None)
+    """
+    if len(close) < 30 or len(macd_line) < 30:
+        return None
+
+    # 取最近 30 根 K 棒
+    price = close.iloc[-30:]
+    macd = macd_line.iloc[-30:]
+    signal = signal_line.iloc[-30:]
+
+    # 找最近 30 根的價格高點/低點
+    price_high_idx = price.idxmax()
+    price_low_idx = price.idxmin()
+
+    # 頂背離：價格創新高但 MACD 沒創新高
+    if price_high_idx == price.index[-1]:  # 最新是新高
+        recent_price_high = price.iloc[-1]
+        # 找前一個高點（排除最近）
+        price_before = price.iloc[:-1]
+        if not price_before.empty:
+            prev_price_high = price_before.max()
+            prev_macd_high = macd.iloc[:-1].max()
+            if recent_price_high > prev_price_high and macd.iloc[-1] < prev_macd_high:
+                return "bearish"
+
+    # 底背離：價格創新低但 MACD 沒創新低
+    if price_low_idx == price.index[-1]:  # 最新是新低
+        recent_price_low = price.iloc[-1]
+        price_before = price.iloc[:-1]
+        if not price_before.empty:
+            prev_price_low = price_before.min()
+            prev_macd_low = macd.iloc[:-1].min()
+            if recent_price_low < prev_price_low and macd.iloc[-1] > prev_macd_low:
+                return "bullish"
+
+    return None
+
+def get_macd_divergence_status(ticker, df):
+    """包裝函數：取得 MACD 背離狀態（用於個股頁面）"""
+    try:
+        close = df['Close']
+        if len(close) < 35:
+            return None
+        macd, signal, hist, status = calculate_macd(close)
+        if macd is None:
+            return None
+        divergence = detect_macd_divergence(close, macd, signal)
+        if divergence == "bullish":
+            return "🔵 底背離（偏多）"
+        elif divergence == "bearish":
+            return "🔴 頂背離（偏空）"
+        else:
+            return "無背離"
+    except Exception as e:
+        logger.error(f"MACD 背離計算失敗: {e}")
+        return None
+
+
 def calculate_rsi(close, period=14):
     if len(close) < period:
         return 50
@@ -1269,6 +1368,28 @@ def compute_stock_summary(ticker, market):
         return None
 
 
+        # ===== 進階技術指標 =====
+        # 布林通道
+        bb_upper, bb_mid, bb_lower, bb_position, bb_width = calculate_bollinger_bands(close_series)
+        if bb_upper is not None:
+            bb_status = f"上軌: {bb_upper:.2f} | 中軌: {bb_mid:.2f} | 下軌: {bb_lower:.2f}"
+            bb_position_pct = round(bb_position * 100, 1)
+            bb_signal = "🔴 超買" if bb_position > 0.8 else "🟢 超賣" if bb_position < 0.2 else "⚪ 中性"
+        else:
+            bb_status = "無數據"
+            bb_position_pct = 50
+            bb_signal = "⚪ 中性"
+
+        # KD 指標
+        k_val, d_val = calculate_kd(df['High'], df['Low'], df['Close'])
+        kd_signal = "🔴 超買" if k_val > 80 else "🟢 超賣" if k_val < 20 else "⚪ 中性"
+        kd_status = f"K={k_val:.1f}, D={d_val:.1f}"
+
+        # MACD 背離
+        macd_divergence = get_macd_divergence_status(ticker, df)
+        if macd_divergence is None:
+            macd_divergence = "計算中..."
+
 def update_all_ai_scores():
     logger.info("開始背景更新 AI 評分...")
     start_time = time.time()
@@ -1799,6 +1920,176 @@ def clean_nan(value, default='N/A'):
         return [clean_nan(v, default) for v in value]
     return value
 
+
+# ================== 融資融券與借券賣出數據 ==================
+
+def fetch_margin_short(ticker, date=None):
+    """
+    從證交所抓取個股融資融券與借券賣出餘額
+    回傳 (融資餘額, 融券餘額, 借券賣出餘額, 資料日期)
+    """
+    import requests
+    from datetime import datetime, timedelta
+
+    stock_id = ticker.replace('.TW', '')
+    if date is None:
+        date = datetime.now().strftime('%Y%m%d')
+    else:
+        date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
+
+    # 嘗試最近 5 個交易日
+    for i in range(5):
+        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
+        # 融資融券 API
+        url1 = f"https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date={check_date}&stockId={stock_id}"
+        # 借券賣出 API（需測試是否有效，若無則忽略）
+        url2 = f"https://www.twse.com.tw/exchangeReport/MI_GS?response=json&date={check_date}&stockId={stock_id}"
+
+        try:
+            # 抓取融資融券
+            resp1 = requests.get(url1, timeout=10)
+            if resp1.status_code == 200:
+                data1 = resp1.json()
+                if data1.get('stat') == 'OK' and 'data' in data1 and data1['data']:
+                    row = data1['data'][0]
+                    # 欄位順序：股票代號, 股票名稱, 融資買進, 融資賣出, 融資現金償還, 融資餘額, 融資增減, ...
+                    # 融資餘額在第 5 欄 (index 5)
+                    # 融券餘額在第 10 欄 (index 10)
+                    margin = int(row[5].replace(',', '')) if row[5] else 0
+                    short = int(row[10].replace(',', '')) if row[10] else 0
+                else:
+                    margin = short = 0
+            else:
+                margin = short = 0
+
+            # 抓取借券賣出（可能無資料）
+            try:
+                resp2 = requests.get(url2, timeout=10)
+                if resp2.status_code == 200:
+                    data2 = resp2.json()
+                    if data2.get('stat') == 'OK' and 'data' in data2 and data2['data']:
+                        row2 = data2['data'][0]
+                        # 借券賣出餘額（張數）通常是 row[3] 或 row[4]，需確認
+                        # 此處假設為 row[3]
+                        short_sell = int(row2[3].replace(',', '')) if row2[3] else 0
+                    else:
+                        short_sell = 0
+                else:
+                    short_sell = 0
+            except:
+                short_sell = 0
+
+            # 若有數據則回傳（融資或融券任一有資料即可）
+            if margin > 0 or short > 0 or short_sell > 0:
+                logger.info(f"成功抓取 {ticker} 在 {check_date} 的融資融券/借券資料")
+                return margin, short, short_sell, check_date
+            else:
+                continue
+        except Exception as e:
+            logger.error(f"抓取 {ticker} 在 {check_date} 的融資融券失敗: {e}")
+            continue
+
+    logger.warning(f"{ticker} 連續5天找不到融資融券資料")
+    return None, None, None, None
+
+def update_margin_short_data(ticker):
+    """更新單一股票的融資融券與借券賣出數據"""
+    margin, short, short_sell, data_date = fetch_margin_short(ticker)
+    if margin is None:
+        logger.warning(f"{ticker} 無融資融券資料，跳過更新")
+        return
+    with closing(get_db_connection()) as conn:
+        cur = conn.cursor()
+        if DATABASE_URL:
+            cur.execute("""
+                INSERT INTO margin_short (stock_id, date, margin_balance, short_balance, short_sell_balance)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (stock_id, date) DO UPDATE SET
+                    margin_balance = EXCLUDED.margin_balance,
+                    short_balance = EXCLUDED.short_balance,
+                    short_sell_balance = EXCLUDED.short_sell_balance
+            """, (ticker, data_date, margin, short, short_sell))
+        else:
+            cur.execute("""
+                INSERT OR REPLACE INTO margin_short (stock_id, date, margin_balance, short_balance, short_sell_balance)
+                VALUES (?, ?, ?, ?, ?)
+            """, (ticker, data_date, margin, short, short_sell))
+        conn.commit()
+    logger.info(f"更新 {ticker} ({data_date}) 融資={margin}, 融券={short}, 借券賣出={short_sell}")
+
+def get_margin_short_data(ticker, date=None):
+    """取得最新融資融券與借券賣出數據"""
+    with closing(get_db_connection()) as conn:
+        cur = conn.cursor()
+        if DATABASE_URL:
+            if date is None:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = %s
+                    ORDER BY date DESC LIMIT 1
+                """, (ticker,))
+            else:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = %s AND date = %s
+                """, (ticker, date))
+        else:
+            if date is None:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = ?
+                    ORDER BY date DESC LIMIT 1
+                """, (ticker,))
+            else:
+                cur.execute("""
+                    SELECT margin_balance, short_balance, short_sell_balance, date
+                    FROM margin_short
+                    WHERE stock_id = ? AND date = ?
+                """, (ticker, date))
+        row = cur.fetchone()
+        if row:
+            return row[0], row[1], row[2], row[3]
+    return None, None, None, None
+
+def get_margin_short_score(margin, short, short_sell, current_price=None):
+    """
+    將融資融券數據轉換為分數（0~100）
+    融資過高是過熱訊號（負向），融券過高是偏空（但若股價上漲可能被軋空）
+    借券賣出增加是偏空
+    此為簡單示範，可依實戰調整
+    """
+    score = 50
+    # 融資：若超過 5 萬張則視為過熱（依市值調整）
+    if margin is not None:
+        if margin > 50000:
+            score -= 20
+        elif margin > 20000:
+            score -= 10
+        else:
+            score += 10
+
+    # 融券：若超過 1 萬張可能被軋空（偏多），若很低則正常
+    if short is not None:
+        if short > 10000:
+            score += 15   # 高融券可能是軋空潛力
+        elif short > 5000:
+            score += 5
+        else:
+            pass
+
+    # 借券賣出：增加是偏空
+    if short_sell is not None:
+        if short_sell > 30000:
+            score -= 25
+        elif short_sell > 10000:
+            score -= 10
+
+    return max(0, min(100, score))
+
+
 # ================== 三大法人與主力籌碼數據整合 ==================
 
 
@@ -1980,6 +2271,21 @@ def update_large_shareholders_data(ticker):
             ''', (ticker, today, ratio, 0))
         conn.commit()
     logger.info(f"更新 {ticker} 千張大戶持股比率: {ratio:.2f}%")
+
+        # 取得融資融券與借券賣出數據（台股）
+        margin_score = None
+        margin_data = None
+        if market == 'tw':
+            margin, short, short_sell, ms_date = get_margin_short_data(ticker)
+            if margin is not None:
+                margin_data = f"融資:{margin:,} 融券:{short:,} 借券賣出:{short_sell:,} (日期:{ms_date})"
+                margin_score = get_margin_short_score(margin, short, short_sell, curr)
+            else:
+                margin_data = "無資料"
+                margin_score = 50
+        else:
+            margin_data = "美股無融資數據"
+            margin_score = 50
 
 
 def get_institutional_data(ticker, date=None):
@@ -3313,7 +3619,7 @@ def indicators_page(ticker):
             inst_display = "無資料"
             inst_score = 50
 
-        return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
+                return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
                                pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
                                macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
                                ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
@@ -3336,10 +3642,10 @@ def indicators_page(ticker):
                                ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
                                gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
                                unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
-                               pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion)
-    except Exception as e:
-        logger.error(f"indicators_page 錯誤: {e}", exc_info=True)
-        return f"<h1>錯誤</h1><pre>{e}</pre>", 500
+                               pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion,
+                               bb_status=bb_status, bb_position_pct=bb_position_pct, bb_signal=bb_signal,
+                               kd_status=kd_status, kd_signal=kd_signal,
+                               macd_divergence=macd_divergence)
 
 
 @app.route('/bonding')
@@ -3605,3 +3911,13 @@ if __name__ == "__main__":
 
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=debug_mode, threaded=True)
+
+    # 每日更新融資融券與借券賣出（交易日 17:30）
+    scheduler.add_job(
+        func=lambda: [update_margin_short_data(t) for t in get_all_tickers('tw')],
+        trigger="cron",
+        day_of_week='mon-fri',
+        hour=17,
+        minute=30,
+        max_instances=1
+    )
