@@ -338,6 +338,7 @@ def calculate_bollinger_bands(close, period=20, std_dev=2):
         bandwidth_pct = (current_price - lower) / (upper - lower)
     return upper, ma, lower, bandwidth_pct, (upper - lower) / ma
 
+
 def calculate_kd(high, low, close, period=9, smooth_k=3, smooth_d=3):
     """
     計算 KD 指標
@@ -354,6 +355,7 @@ def calculate_kd(high, low, close, period=9, smooth_k=3, smooth_d=3):
     k = rsv.ewm(span=smooth_k, adjust=False).mean()
     d = k.ewm(span=smooth_d, adjust=False).mean()
     return k.iloc[-1], d.iloc[-1]
+
 
 def detect_macd_divergence(close, macd_line, signal_line):
     """
@@ -394,6 +396,7 @@ def detect_macd_divergence(close, macd_line, signal_line):
                 return "bullish"
 
     return None
+
 
 def get_macd_divergence_status(ticker, df):
     """包裝函數：取得 MACD 背離狀態（用於個股頁面）"""
@@ -1367,10 +1370,10 @@ def compute_stock_summary(ticker, market):
         logger.error(f"計算 {ticker} 摘要失敗: {e}")
         return None
 
-
         # ===== 進階技術指標 =====
         # 布林通道
-        bb_upper, bb_mid, bb_lower, bb_position, bb_width = calculate_bollinger_bands(close_series)
+        bb_upper, bb_mid, bb_lower, bb_position, bb_width = calculate_bollinger_bands(
+            close_series)
         if bb_upper is not None:
             bb_status = f"上軌: {bb_upper:.2f} | 中軌: {bb_mid:.2f} | 下軌: {bb_lower:.2f}"
             bb_position_pct = round(bb_position * 100, 1)
@@ -1389,6 +1392,7 @@ def compute_stock_summary(ticker, market):
         macd_divergence = get_macd_divergence_status(ticker, df)
         if macd_divergence is None:
             macd_divergence = "計算中..."
+
 
 def update_all_ai_scores():
     logger.info("開始背景更新 AI 評分...")
@@ -1939,7 +1943,8 @@ def fetch_margin_short(ticker, date=None):
 
     # 嘗試最近 5 個交易日
     for i in range(5):
-        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
+        check_date = (datetime.strptime(date, '%Y%m%d') -
+                      timedelta(days=i)).strftime('%Y%m%d')
         # 融資融券 API
         url1 = f"https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date={check_date}&stockId={stock_id}"
         # 借券賣出 API（需測試是否有效，若無則忽略）
@@ -1971,7 +1976,8 @@ def fetch_margin_short(ticker, date=None):
                         row2 = data2['data'][0]
                         # 借券賣出餘額（張數）通常是 row[3] 或 row[4]，需確認
                         # 此處假設為 row[3]
-                        short_sell = int(row2[3].replace(',', '')) if row2[3] else 0
+                        short_sell = int(row2[3].replace(
+                            ',', '')) if row2[3] else 0
                     else:
                         short_sell = 0
                 else:
@@ -1991,6 +1997,7 @@ def fetch_margin_short(ticker, date=None):
 
     logger.warning(f"{ticker} 連續5天找不到融資融券資料")
     return None, None, None, None
+
 
 def update_margin_short_data(ticker):
     """更新單一股票的融資融券與借券賣出數據"""
@@ -2015,7 +2022,9 @@ def update_margin_short_data(ticker):
                 VALUES (?, ?, ?, ?, ?)
             """, (ticker, data_date, margin, short, short_sell))
         conn.commit()
-    logger.info(f"更新 {ticker} ({data_date}) 融資={margin}, 融券={short}, 借券賣出={short_sell}")
+    logger.info(
+        f"更新 {ticker} ({data_date}) 融資={margin}, 融券={short}, 借券賣出={short_sell}")
+
 
 def get_margin_short_data(ticker, date=None):
     """取得最新融資融券與借券賣出數據"""
@@ -2053,6 +2062,7 @@ def get_margin_short_data(ticker, date=None):
         if row:
             return row[0], row[1], row[2], row[3]
     return None, None, None, None
+
 
 def get_margin_short_score(margin, short, short_sell, current_price=None):
     """
@@ -2095,6 +2105,7 @@ def get_margin_short_score(margin, short, short_sell, current_price=None):
 def extract_stock_number(ticker):
     """從 '2330.TW' 提取 '2330'"""
     return ticker.replace('.TW', '')
+
 
 def init_institutional_db():
     """初始化三大法人資料庫，支援 SQLite 和 PostgreSQL"""
@@ -2167,6 +2178,7 @@ def init_institutional_db():
         conn.commit()
     logger.info("三大法人資料庫初始化完成")
 
+
 def fetch_institutional_holders(ticker, date=None):
     import requests
     from datetime import datetime, timedelta
@@ -2176,7 +2188,8 @@ def fetch_institutional_holders(ticker, date=None):
     else:
         date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
     for i in range(5):
-        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
+        check_date = (datetime.strptime(date, '%Y%m%d') -
+                      timedelta(days=i)).strftime('%Y%m%d')
         url = f"https://www.twse.com.tw/fund/T86?response=json&date={check_date}&selectType=ALLBUT0999"
         try:
             resp = requests.get(url, timeout=10)
@@ -2185,10 +2198,14 @@ def fetch_institutional_holders(ticker, date=None):
                 if data.get('stat') == 'OK' and 'data' in data:
                     for row in data['data']:
                         if len(row) >= 6 and row[0].strip() == stock_id:
-                            foreign = int(row[3].replace(',', '')) if row[3] else 0
-                            trust = int(row[4].replace(',', '')) if row[4] else 0
-                            dealer = int(row[5].replace(',', '')) if row[5] else 0
-                            logger.info(f"成功抓取 {ticker} 在 {check_date} 的三大法人資料")
+                            foreign = int(row[3].replace(
+                                ',', '')) if row[3] else 0
+                            trust = int(row[4].replace(
+                                ',', '')) if row[4] else 0
+                            dealer = int(row[5].replace(
+                                ',', '')) if row[5] else 0
+                            logger.info(
+                                f"成功抓取 {ticker} 在 {check_date} 的三大法人資料")
                             return foreign, trust, dealer, check_date
                     continue
         except Exception as e:
@@ -2196,6 +2213,7 @@ def fetch_institutional_holders(ticker, date=None):
             continue
     logger.warning(f"{ticker} 連續5天都找不到三大法人資料")
     return None, None, None, None
+
 
 def update_institutional_data(ticker):
     foreign, trust, dealer, data_date = fetch_institutional_holders(ticker)
@@ -2219,7 +2237,9 @@ def update_institutional_data(ticker):
                 VALUES (?, ?, ?, ?, ?)
             """, (ticker, data_date, foreign, trust, dealer))
         conn.commit()
-    logger.info(f"更新 {ticker} ({data_date}) 三大法人: 外資={foreign}, 投信={trust}, 自營={dealer}")
+    logger.info(
+        f"更新 {ticker} ({data_date}) 三大法人: 外資={foreign}, 投信={trust}, 自營={dealer}")
+
 
 def get_institutional_data(ticker, date=None):
     with closing(get_db_connection()) as conn:
@@ -2257,6 +2277,7 @@ def get_institutional_data(ticker, date=None):
             return row[0], row[1], row[2], row[3]
     return None, None, None, None
 
+
 def calculate_institutional_score(foreign, trust, dealer):
     score = 50
     if foreign is not None:
@@ -2278,6 +2299,7 @@ def calculate_institutional_score(foreign, trust, dealer):
 
 # ================== 融資融券與借券賣出 ==================
 
+
 def fetch_margin_short(ticker, date=None):
     """從證交所抓取個股融資融券與借券賣出餘額"""
     import requests
@@ -2290,7 +2312,8 @@ def fetch_margin_short(ticker, date=None):
         date = datetime.strptime(date, '%Y%m%d').strftime('%Y%m%d')
 
     for i in range(5):
-        check_date = (datetime.strptime(date, '%Y%m%d') - timedelta(days=i)).strftime('%Y%m%d')
+        check_date = (datetime.strptime(date, '%Y%m%d') -
+                      timedelta(days=i)).strftime('%Y%m%d')
         url = f"https://www.twse.com.tw/exchangeReport/MI_MARGN?response=json&date={check_date}&stockId={stock_id}"
         try:
             resp = requests.get(url, timeout=10)
@@ -2298,8 +2321,10 @@ def fetch_margin_short(ticker, date=None):
                 data = resp.json()
                 if data.get('stat') == 'OK' and 'data' in data and data['data']:
                     row = data['data'][0]
-                    margin = int(row[5].replace(',', '')) if len(row) > 5 and row[5] else 0
-                    short = int(row[10].replace(',', '')) if len(row) > 10 and row[10] else 0
+                    margin = int(row[5].replace(',', '')) if len(
+                        row) > 5 and row[5] else 0
+                    short = int(row[10].replace(',', '')) if len(
+                        row) > 10 and row[10] else 0
                     # 借券賣出（使用 MI_GS API）
                     short_sell = 0
                     try:
@@ -2309,7 +2334,8 @@ def fetch_margin_short(ticker, date=None):
                             data2 = resp2.json()
                             if data2.get('stat') == 'OK' and 'data' in data2 and data2['data']:
                                 row2 = data2['data'][0]
-                                short_sell = int(row2[3].replace(',', '')) if len(row2) > 3 and row2[3] else 0
+                                short_sell = int(row2[3].replace(',', '')) if len(
+                                    row2) > 3 and row2[3] else 0
                     except:
                         pass
                     logger.info(f"成功抓取 {ticker} 在 {check_date} 的融資融券資料")
@@ -2320,6 +2346,7 @@ def fetch_margin_short(ticker, date=None):
 
     logger.warning(f"{ticker} 連續5天找不到融資融券資料")
     return None, None, None, None
+
 
 def update_margin_short_data(ticker):
     """更新單一股票的融資融券與借券賣出數據"""
@@ -2344,7 +2371,9 @@ def update_margin_short_data(ticker):
                 VALUES (?, ?, ?, ?, ?)
             """, (ticker, data_date, margin, short, short_sell))
         conn.commit()
-    logger.info(f"更新 {ticker} ({data_date}) 融資={margin}, 融券={short}, 借券賣出={short_sell}")
+    logger.info(
+        f"更新 {ticker} ({data_date}) 融資={margin}, 融券={short}, 借券賣出={short_sell}")
+
 
 def get_margin_short_data(ticker, date=None):
     """取得最新融資融券與借券賣出數據"""
@@ -2382,6 +2411,7 @@ def get_margin_short_data(ticker, date=None):
         if row:
             return row[0], row[1], row[2], row[3]
     return None, None, None, None
+
 
 def get_margin_short_score(margin, short, short_sell, current_price=None):
     """將融資融券數據轉換為分數（0~100）"""
@@ -3293,17 +3323,17 @@ def tw_page():
     dow_curr, dow_change, dow_pct = get_dow_index()
     nas_curr, nas_change, nas_pct = get_nasdaq_index()
     sox_curr, sox_change, sox_pct = get_phlx_index()
-    
+
     # 取得排序參數（預設按 ai_score 降序）
     sort_by = request.args.get('sort_by', 'ai_score')
     order = request.args.get('order', 'desc')
-    
+
     try:
         all_stocks = json.load(open(AI_SCORES_FILE, 'r', encoding='utf-8'))
         stocks = [s for s in all_stocks if s.get('market') == 'tw']
     except:
         stocks = []
-    
+
     # 排序
     reverse = (order == 'desc')
     if sort_by == 'ai_score':
@@ -3316,10 +3346,10 @@ def tw_page():
         stocks.sort(key=lambda x: x.get('change', 0), reverse=reverse)
     else:
         stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
-    
-    return render_template('tw_us.html', 
-                           market='tw', 
-                           stocks=stocks, 
+
+    return render_template('tw_us.html',
+                           market='tw',
+                           stocks=stocks,
                            title="台股監控 - 所有自選股",
                            sort_by=sort_by,
                            order=order,
@@ -3330,6 +3360,7 @@ def tw_page():
                            sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
                            shioaji_status=get_shioaji_status())
 
+
 @app.route('/us')
 def us_page():
     tw_curr, tw_change, tw_pct = get_tw_index()
@@ -3337,16 +3368,16 @@ def us_page():
     dow_curr, dow_change, dow_pct = get_dow_index()
     nas_curr, nas_change, nas_pct = get_nasdaq_index()
     sox_curr, sox_change, sox_pct = get_phlx_index()
-    
+
     sort_by = request.args.get('sort_by', 'ai_score')
     order = request.args.get('order', 'desc')
-    
+
     try:
         all_stocks = json.load(open(AI_SCORES_FILE, 'r', encoding='utf-8'))
         stocks = [s for s in all_stocks if s.get('market') == 'us']
     except:
         stocks = []
-    
+
     reverse = (order == 'desc')
     if sort_by == 'ai_score':
         stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=reverse)
@@ -3358,10 +3389,10 @@ def us_page():
         stocks.sort(key=lambda x: x.get('change', 0), reverse=reverse)
     else:
         stocks.sort(key=lambda x: x.get('ai_score', 0), reverse=True)
-    
-    return render_template('tw_us.html', 
-                           market='us', 
-                           stocks=stocks, 
+
+    return render_template('tw_us.html',
+                           market='us',
+                           stocks=stocks,
                            title="美股監控 - 所有自選股",
                            sort_by=sort_by,
                            order=order,
@@ -3371,6 +3402,7 @@ def us_page():
                            nas_curr=nas_curr, nas_change=nas_change, nas_pct=nas_pct,
                            sox_curr=sox_curr, sox_change=sox_change, sox_pct=sox_pct,
                            shioaji_status=get_shioaji_status())
+
 
 @app.route('/ai_ranking')
 def ai_ranking():
@@ -3667,33 +3699,33 @@ def indicators_page(ticker):
             inst_display = "無資料"
             inst_score = 50
 
-                return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
-                               pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
-                               macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
-                               ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
-                               ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
-                               volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
-                               resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
-                               rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
-                               xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
-                               lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
-                               ensemble_score=ensemble[0] if ensemble[0] else None,
-                               ensemble_signal=ensemble[1] if ensemble[1] else None,
-                               ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
-                               smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
-                               trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
-                               ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
-                               options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
-                               ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
-                               ma120_trend=ma120_trend, ma240_trend=ma240_trend,
-                               ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
-                               ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
-                               gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
-                               unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
-                               pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion,
-                               bb_status=bb_status, bb_position_pct=bb_position_pct, bb_signal=bb_signal,
-                               kd_status=kd_status, kd_signal=kd_signal,
-                               macd_divergence=macd_divergence)
+            return render_template('indicators.html', ticker=ticker, price=round(curr, 2), change=round(change, 2),
+                                   pct=round(pct, 2), rsi=round(rsi, 1), rsi_status=rsi_status, macd_status=macd_status,
+                                   macd_hist=round(hist, 3) if hist else 0, vwap_status=vwap_status,
+                                   ma5=round(ma5, 2), ma10=round(ma10, 2), ma20=round(ma20, 2), ma60=round(ma60, 2),
+                                   ma120=round(ma120, 2), ma240=round(ma240, 2), ma_trend=ma_trend,
+                                   volume_ratio=round(vol_ratio, 2), ai_score=ai_score, reasons=reasons,
+                                   resistance=sr['resistance'], target=sr['target'], stop_loss=sr['stop_loss'],
+                                   rf_pred=f"{rf_pred_val:+.1f}%" if rf_pred_val else None,
+                                   xgb_pred=f"{xgb_pred_val:+.1f}%" if xgb_pred_val else None,
+                                   lgb_pred=f"{lgb_pred_val:+.1f}%" if lgb_pred_val else None,
+                                   ensemble_score=ensemble[0] if ensemble[0] else None,
+                                   ensemble_signal=ensemble[1] if ensemble[1] else None,
+                                   ensemble_details=ensemble[2] if ensemble[2] else {}, agreement=ensemble[3] if ensemble[3] else 0,
+                                   smart_score=ensemble[4] if ensemble[4] else 50, hype_score=ensemble[5] if ensemble[5] else 50,
+                                   trend_score=ensemble[6] if ensemble[6] else 50, growth_score=ensemble[7] if ensemble[7] else 50,
+                                   ten_bagger_score=ensemble[8] if ensemble[8] else 50, consensus_score=ensemble[10] if ensemble[10] else 0,
+                                   options=options, market=market, research_links=research_links, shioaji_status=get_shioaji_status(),
+                                   ma5_trend=ma5_trend, ma10_trend=ma10_trend, ma20_trend=ma20_trend, ma60_trend=ma60_trend,
+                                   ma120_trend=ma120_trend, ma240_trend=ma240_trend,
+                                   ma5_ratio=ma5_ratio, ma10_ratio=ma10_ratio, ma20_ratio=ma20_ratio, ma60_ratio=ma60_ratio,
+                                   ma120_ratio=ma120_ratio, ma240_ratio=ma240_ratio,
+                                   gex_call=gex_call, gex_put=gex_put, gex_flip=gex_flip, tactical_advice=tactical_advice,
+                                   unusual_options=unusual_opt, delta_analysis=delta_analysis, institutional_data=inst_display, institutional_score=inst_score,
+                                   pcr=pcr, call_wall=call_wall, put_wall=put_wall, trading_suggestion=trading_suggestion,
+                                   bb_status=bb_status, bb_position_pct=bb_position_pct, bb_signal=bb_signal,
+                                   kd_status=kd_status, kd_signal=kd_signal,
+                                   macd_divergence=macd_divergence)
 
 
 @app.route('/bonding')
@@ -3960,11 +3992,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=debug_mode, threaded=True)
 
-    
-
     # 每日更新融資融券與借券賣出（交易日 17:30）
     scheduler.add_job(
-        func=lambda: [update_margin_short_data(t) for t in get_all_tickers('tw')],
+        func=lambda: [update_margin_short_data(
+            t) for t in get_all_tickers('tw')],
         trigger="cron",
         day_of_week='mon-fri',
         hour=17,
